@@ -1,11 +1,4 @@
 -----------------------------------
-_DISCLAIMER:_
-
-Welcome to the **raylib game template**!
-
-This template provides a base structure to start developing a small raylib game in plain C. The repo is also pre-configured with a default `LICENSE` (zlib/libpng) and a `README.md` (this one) to be properly filled by users. Feel free to change the LICENSE as required.
-
-All the sections defined by `$(Data to Fill)` are expected to be edited and filled properly. It's recommended to delete this disclaimer message after editing this `README.md` file.
 
 ## Getting Started with this template
 
@@ -47,7 +40,7 @@ This template has been created to be used with raylib (www.raylib.com) and it's 
 _Copyright (c) 2014-2026 Ramon Santamaria ([@raysan5](https://github.com/raysan5))_
 -----------------------------------
 
-## $(Game Title)
+## Hexactly
 
 ![$(Game Title)](screenshots/screenshot000.png "$(Game Title)")
 
