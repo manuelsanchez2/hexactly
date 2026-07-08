@@ -2,28 +2,49 @@
 #include "config.h"
 #include "screen.h"
 
+#if defined(PLATFORM_WEB)
+    #include <emscripten/emscripten.h>
+#endif
+
+static std::unique_ptr<Screen> current;
+
+#if !defined(PLATFORM_WEB)
+static bool shouldQuit = false;
+#endif
+
+static void UpdateDrawFrame() {
+    ScreenType next = current->update();
+
+    if (next == ScreenType::QUIT) {
+    #if defined(PLATFORM_WEB)
+        emscripten_cancel_main_loop();
+    #else
+        shouldQuit = true;
+    #endif
+    } else if (next != ScreenType::NONE) {
+        current = createScreen(next);
+    }
+
+    BeginDrawing();
+    current->draw();
+    EndDrawing();
+}
+
 int main() {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Hexactly");
-    SetTargetFPS(60);
 
     SetExitKey(KEY_NULL);
 
-    std::unique_ptr<Screen> current = createScreen(ScreenType::TITLE);
+    current = createScreen(ScreenType::TITLE);
 
-    while (!WindowShouldClose()) {
-        ScreenType next = current->update();
-
-        if (next == ScreenType::QUIT) {
-            break;
-        }
-        if (next != ScreenType::NONE) {
-            current = createScreen(next);
-        }
-
-        BeginDrawing();
-        current->draw();
-        EndDrawing();
+#if defined(PLATFORM_WEB)
+    emscripten_set_main_loop(UpdateDrawFrame, 0, 1);
+#else
+    SetTargetFPS(60);
+    while (!WindowShouldClose() && !shouldQuit) {
+        UpdateDrawFrame();
     }
+#endif
 
     CloseWindow();
     return 0;
