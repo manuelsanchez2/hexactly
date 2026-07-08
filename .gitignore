@@ -36,6 +36,10 @@
 *.x86_64
 *.hex
 
+# Compiled game binary (build output, produced by src/Makefile and root Makefile)
+/hexactly
+/src/hexactly
+
 # Debug files
 *.dSYM/
 *.su
