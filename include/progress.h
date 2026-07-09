@@ -1,0 +1,14 @@
+#pragma once
+
+struct Progress {
+    unsigned long long done = 0;
+    bool seenRules = false;
+};
+
+Progress loadProgress();
+void     saveProgress(const Progress& p);
+
+inline bool levelDone(const Progress& p, int i)    { return (p.done >> i) & 1ull; }
+inline void markLevelDone(Progress& p, int i)      { p.done |= (1ull << i); }
+
+int firstIncomplete(const Progress& p, int count);
