@@ -29,6 +29,13 @@ static void UpdateDrawFrame() {
     BeginDrawing();
     current->draw();
     EndDrawing();
+
+#if defined(HEX_DEV)
+    if (IsKeyPressed(KEY_S)) {
+        static int shotN = 0;
+        TakeScreenshot(TextFormat("hexactly_shot_%03d.png", shotN++));
+    }
+#endif
 }
 
 int main() {

@@ -7,7 +7,10 @@ CXX = clang++
 # Where Homebrew installed raylib (Apple Silicon). Intel Macs: /usr/local
 RAYLIB = /opt/homebrew/opt/raylib
 
-CXXFLAGS = -std=c++17 -Wall -Iinclude -I$(RAYLIB)/include
+# -DHEX_DEV enables local-only dev helpers (e.g. the S-key screenshot). The CI
+# builds use src/Makefile, which does NOT define it, so those helpers are
+# compiled out of the shipped desktop/web/windows builds.
+CXXFLAGS = -std=c++17 -Wall -DHEX_DEV -Iinclude -I$(RAYLIB)/include
 LDFLAGS  = -L$(RAYLIB)/lib -lraylib \
            -framework Cocoa -framework IOKit -framework CoreVideo -framework CoreAudio
 

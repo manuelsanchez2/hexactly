@@ -43,6 +43,9 @@
 # Resources copied next to the root binary by the root Makefile (dev convenience)
 /resources
 
+# Screenshots captured in-game with the S key
+hexactly_shot_*.png
+
 # Debug files
 *.dSYM/
 *.su
