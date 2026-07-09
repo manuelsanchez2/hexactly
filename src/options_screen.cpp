@@ -1,38 +1,45 @@
 #include "options_screen.h"
 #include "config.h"
-#include "ui.h"
+#include "audio.h"
+#include "gamefont.h"
 #include "raylib.h"
 
-static Rectangle soundButton() { return { SCREEN_WIDTH/2.0f - 130, 280, 260, 58 }; }
-static Rectangle volMinus()    { return { SCREEN_WIDTH/2.0f - 130, 360,  58, 58 }; }
-static Rectangle volPlus()     { return { SCREEN_WIDTH/2.0f +  72, 360,  58, 58 }; }
-static Rectangle backButton()  { return { SCREEN_WIDTH/2.0f - 130, 470, 260, 58 }; }
+OptionsScreen::OptionsScreen() {
+    layout = loadLayout("options");
+    menuFromLayout(menu, ids, layout);
+    mtime = layoutFileTime("options");
+}
 
 ScreenType OptionsScreen::update() {
-    if (buttonClicked(soundButton())) soundOn = !soundOn;
-    if (buttonClicked(volMinus()))    volume = (volume > 0)   ? volume - 10 : 0;
-    if (buttonClicked(volPlus()))     volume = (volume < 100) ? volume + 10 : 100;
+    if (editorTick(editor, layout, menu, ids, mtime)) return ScreenType::NONE;
 
-    if (buttonClicked(backButton()))  return ScreenType::TITLE;
-
+    int a = menuUpdate(menu, GetFrameTime());
+    if (a >= 0) {
+        const std::string& id = ids[a];
+        if (id == "mus_minus") audioSetMusicVolume(audioGetMusicVolume() - 0.1f);
+        if (id == "mus_plus")  audioSetMusicVolume(audioGetMusicVolume() + 0.1f);
+        if (id == "sfx_minus" || id == "sfx_plus") {
+            audioSetSfxVolume(audioGetSfxVolume() + (id == "sfx_plus" ? 0.1f : -0.1f));
+            playMerge();
+        }
+        if (id == "back") return ScreenType::TITLE;
+        audioSaveSettings();
+    }
     return ScreenType::NONE;
 }
 
 void OptionsScreen::draw() {
     ClearBackground(PAPER);
 
-    const char *title = "Options";
-    int titleSize = 56;
-    int titleW = MeasureText(title, titleSize);
-    DrawText(title, SCREEN_WIDTH/2 - titleW/2, 150, titleSize, INK);
+    layoutDrawLabels(layout);
 
-    drawButton(soundButton(), soundOn ? "Sound: ON" : "Sound: OFF");
+    const char* mus = TextFormat("Music: %d", (int)(audioGetMusicVolume() * 100 + 0.5f));
+    titleDraw(mus, SCREEN_WIDTH/2 - titleMeasure(mus, 24).x/2, 264, 24, INK);
 
-    drawButton(volMinus(), "-");
-    drawButton(volPlus(),  "+");
-    const char *vol = TextFormat("Volume: %d", volume);
-    int volW = MeasureText(vol, 24);
-    DrawText(vol, SCREEN_WIDTH/2 - volW/2, 376, 24, INK);
+    const char* sfx = TextFormat("SFX: %d", (int)(audioGetSfxVolume() * 100 + 0.5f));
+    titleDraw(sfx, SCREEN_WIDTH/2 - titleMeasure(sfx, 24).x/2, 364, 24, INK);
 
-    drawButton(backButton(), "Back");
+    menuDraw(menu);
+
+    editorDrawOverlay(editor, layout);
 }
