@@ -1,8 +1,8 @@
 # title.layout
 
-label  id=title align=center x=360 y=210 size=84 font=title color=ink text=HEXACTLY
-label  id=subtitle align=center x=360 y=345 size=22 font=plain color=ink text=merge equal neighbours into one tile
-button id=play x=240 y=433 w=240 h=58 text=Play
-button id=options x=240 y=509 w=240 h=58 text=Options
-button id=quit x=240 y=583 w=240 h=58 text=Quit
+label  id=title align=center x=363.633 y=227.883 size=84 font=title color=ink text=HEXACTLY
+label  id=subtitle align=center x=363.129 y=333.418 size=22 font=plain color=ink text=merge equal neighbours into one tile
+button id=play x=240 y=394.305 w=240 h=58 text=Play
+button id=options x=240 y=467.469 w=240 h=58 text=Options
+button id=quit x=239.641 y=539.801 w=240 h=58 text=Quit
 label  id=version align=left x=622 y=685 size=16 font=title color=gray text=v.0.0.1

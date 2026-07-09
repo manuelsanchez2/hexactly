@@ -393,7 +393,7 @@ ScreenType GameScreen::update() {
             rulesActive = false; rulesClosing = false;
         } else {
             int a = menuUpdate(rulesMenu, dt);
-            if (!rulesClosing && (a == 0 || IsKeyPressed(KEY_ESCAPE))) closeRules();
+            if (!rulesClosing && (a == 0 || IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE))) closeRules();
         }
         return ScreenType::NONE;
     }
@@ -414,7 +414,7 @@ ScreenType GameScreen::update() {
         pauseMenu.offset.y = (1.0f - easeOutBack(pauseAnim)) * PAUSE_SLIDE;
 
         int a = menuUpdate(pauseMenu, dt);
-        if (a == 0 || IsKeyPressed(KEY_ESCAPE)) paused = false;
+        if (a == 0 || IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) paused = false;
         if (a == 1) { loadLevel(currentLevel); paused = false; }
         if (a == 2) return ScreenType::LEVELSELECT;
         return ScreenType::NONE;
@@ -427,7 +427,7 @@ ScreenType GameScreen::update() {
     {
         Vector2 m = GetMousePosition();
         bool overPause = CheckCollisionPointRec(m, pauseR);
-        if (IsKeyPressed(KEY_ESCAPE) ||
+        if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE) ||
             (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && overPause)) {
             paused = true;
             pauseAnim = 0.0f;

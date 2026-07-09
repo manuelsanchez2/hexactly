@@ -42,45 +42,57 @@ _Copyright (c) 2014-2026 Ramon Santamaria ([@raysan5](https://github.com/raysan5
 
 ## Hexactly
 
-![$(Game Title)](screenshots/screenshot000.png "$(Game Title)")
+COOL IMAGE WILL COME HERE 
+<!-- ![$(Game Title)](screenshots/screenshot000.png "$(Game Title)") -->
 
 ### Description
 
-$(Your Game Description)
+Hexactly is a cozy, hand-drawn merge puzzle played on a hexagonal grid. Combine two
+equal neighbouring tiles and they double. Your goal: chain your merges to reach the target number
+on the goal tile and solve each level before you run out of moves! 
 
 ### Features
 
- - $(Game Feature 01)
- - $(Game Feature 02)
- - $(Game Feature 03)
+ - Puzzle twists: **stones** (inert blockers), **walls** (blocked edges), **portals** (link two far cells) and **cursed** tiles (unlock when you merge beside them).
+ - Move-limited levels that must be solved in the tiles you're given.
+ - Saved progress and a level-select map that unlocks as you complete levels.
 
 ### Controls
 
+Mouse:
+ - **Click** a tile, then an equal neighbour, to merge them
+ - **Drag** a tile onto an equal neighbour to merge (guide line shows the link)
+ - Click the on-screen **info**, **pause** and **undo** buttons
+ - **Scroll wheel** to move through the level-select grid
+
 Keyboard:
- - $(Game Control 01)
- - $(Game Control 02)
- - $(Game Control 03)
+ - **U** / **Z** — undo the last merge
+ - **R** — restart the level
+ - **Esc** / **Backspace** — pause (Resume / Restart / Levels)
+ - **Space** / **Enter** — skip the win celebration
+ - **Arrows** / **Tab** — move menu focus, **Enter** to confirm
 
 ### Screenshots
 
-_TODO: Show your game to the world, animated GIFs recommended!._
+![Title screen](screenshots/title-screen.png "Title screen")
+
+![Completing a level](screenshots/level-complete.png "Completing a level")
 
 ### Developers
 
- - $(Developer 01) - $(Role/Tasks Developed)
- - $(Developer 02) - $(Role/Tasks Developed)
- - $(Developer 03) - $(Role/Tasks Developed)
+ - Manuel Sánchez (Barkhalla Studios) - Code, Design, Audio
 
 ### Links
 
  - YouTube Gameplay: $(YouTube Link)
- - itch.io Release: $(itch.io Game Page)
- - Steam Release: $(Steam Game Page)
+ - itch.io Release: [https://barkhallastudios.itch.io/hexactly](https://barkhallastudios.itch.io/hexactly)
 
 ### License
 
 This project sources are licensed under an unmodified zlib/libpng license, which is an OSI-certified, BSD-like license that allows static linking with closed source software. Check [LICENSE](LICENSE) for further details.
 
-$(Additional Licenses)
 
-*Copyright (c) $(Year) $(User Name) ($(User Twitter/GitHub Name))*
+Music (in-my-happy-space.wav):
+- Contains music (c) 2025 Retro Indie Josh (https://retroindiejosh.itch.io). Licensed under Creative Commons Attribution 4.0 International
+
+*Copyright (c) 2026 Manuel Sánchez GitHub: manusanchez2*
