@@ -8,10 +8,20 @@
 #include "raylib.h"
 #include <cmath>
 
+static const float D2R = 3.14159265f / 180.0f;
 static const float BOARD_DROP = 110.0f;
 static const float TILE_SCALE = 96.0f / 46.0f;
 static const float MODAL_SLIDE = 360.0f;
 static const float PAUSE_WOB_DUR = 0.25f;
+
+static const float CELEBRATE_DUR = 1.10f;
+static const float SWAP_DUR      = 0.42f;
+static const float SWAP_DIST     = SCREEN_WIDTH + 160.0f;
+static const float PRAISE_IN     = 0.35f;
+static const float HALO_DUR      = 0.55f;
+static const float CONFETTI_LIFE = 0.90f;
+
+static float clamp01(float t) { return t < 0 ? 0 : (t > 1 ? 1 : t); }
 
 static void drawHexTile(Vector2 c, float scale, Color tint) {
     Texture2D t = hexTileTexture();
@@ -46,9 +56,6 @@ GameScreen::GameScreen() {
     menuAdd(pauseMenu, mBtn(1), "Restart");
     menuAdd(pauseMenu, mBtn(2), "Main Menu");
 
-    menuAdd(winMenu, mBtn(0), "Next Level");
-    menuAdd(winMenu, mBtn(1), "Levels");
-
     menuAdd(lostMenu, mBtn(0), "Restart");
     menuAdd(lostMenu, mBtn(1), "Main Menu");
 }
@@ -63,14 +70,7 @@ static void resetMenu(Menu &m, float &anim) {
 }
 
 void GameScreen::openPause() { resetMenu(pauseMenu, pauseAnim); }
-
-void GameScreen::openWin() {
-    bool last = (currentLevel + 1 >= LEVEL_COUNT);
-    winMenu.buttons[0].text = last ? "Back to Levels" : "Next Level";
-    resetMenu(winMenu, winAnim);
-}
-
-void GameScreen::openLost() { resetMenu(lostMenu, lostAnim); }
+void GameScreen::openLost()  { resetMenu(lostMenu, lostAnim); }
 
 void GameScreen::loadLevel(int idx) {
     const LevelDef& L = LEVELS[idx];
@@ -125,8 +125,10 @@ void GameScreen::loadLevel(int idx) {
     selectedIdx = -1;
     pressIdx    = -1;
     dragging    = false;
-    won  = false;
-    lost = false;
+    lost        = false;
+    phase       = PH_PLAYING;
+    confettiCount = 0;
+    haloTimer     = 0.0f;
 }
 
 void GameScreen::doMerge(int fromIdx, int toIdx) {
@@ -134,9 +136,69 @@ void GameScreen::doMerge(int fromIdx, int toIdx) {
     board.cells[fromIdx].value = 0;
     board.movesLeft--;
     selectedIdx = -1;
+    checkEnd();
+}
 
-    if (isWon(board)) { won = true; openWin(); }
-    else if (board.movesLeft <= 0 || !anyLegalMove(board)) { lost = true; openLost(); }
+void GameScreen::checkEnd() {
+    if (isWon(board)) {
+        phase     = PH_CELEBRATE;
+        winTimer  = 0.0f;
+        haloTimer = HALO_DUR;
+
+        int wi = -1;
+        int g = goalIndex(board);
+        if (g >= 0 && board.cells[g].goalValue > 0) {
+            wi = g;
+        } else {
+            for (int i = 0; i < board.cellCount; i++)
+                if (board.cells[i].exists && board.cells[i].value > 0) { wi = i; break; }
+        }
+        winCenter = (wi >= 0) ? hexToPixel(board.cells[wi].pos, origin)
+                              : (Vector2){ SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f };
+
+        bool last = (currentLevel + 1 >= LEVEL_COUNT);
+        static const char* WORDS[] = { "Nice!", "Great!", "Well Done!", "Sweet!", "Boom!" };
+        praiseText = last ? "All done!" : WORDS[GetRandomValue(0, 4)];
+        praiseRot  = (float)GetRandomValue(-6, 6);
+
+        spawnConfetti(winCenter);
+    } else if (board.movesLeft <= 0 || !anyLegalMove(board)) {
+        lost = true;
+        openLost();
+    }
+}
+
+void GameScreen::spawnConfetti(Vector2 at) {
+    Color pal[3] = { INK, HEXRED, (Color){ 240, 185, 40, 255 } };
+    confettiCount = 20;
+    for (int i = 0; i < confettiCount; i++) {
+        Confetti& p = confetti[i];
+        p.pos = at;
+        float ang = (float)GetRandomValue(200, 340) * D2R;
+        float spd = (float)GetRandomValue(180, 430);
+        p.vel    = { cosf(ang) * spd, sinf(ang) * spd };
+        p.rot    = (float)GetRandomValue(0, 360);
+        p.rotVel = (float)GetRandomValue(-360, 360);
+        p.col    = pal[GetRandomValue(0, 2)];
+        p.life   = CONFETTI_LIFE * (0.7f + GetRandomValue(0, 60) / 100.0f);
+    }
+}
+
+void GameScreen::beginSwap() {
+    outgoing    = board;
+    outOrigin   = origin;
+    hasOutgoing = true;
+    swapT       = 0.0f;
+
+    if (currentLevel + 1 < LEVEL_COUNT) {
+        finishing = false;
+        loadLevel(++currentLevel);
+        targetOrigin = origin;
+        phase = PH_SWAP;
+    } else {
+        finishing = true;
+        phase = PH_SWAP;
+    }
 }
 
 ScreenType GameScreen::update() {
@@ -150,6 +212,36 @@ ScreenType GameScreen::update() {
 
     float dt = GetFrameTime();
 
+    if (haloTimer > 0) haloTimer -= dt;
+    for (int i = 0; i < confettiCount; i++) {
+        Confetti& p = confetti[i];
+        p.vel.y += 900.0f * dt;
+        p.pos.x += p.vel.x * dt;
+        p.pos.y += p.vel.y * dt;
+        p.rot   += p.rotVel * dt;
+        p.life  -= dt;
+    }
+
+    if (phase == PH_CELEBRATE) {
+        winTimer += dt;
+        bool tap = winTimer > 0.2f &&
+                   (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) ||
+                    IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ENTER));
+        if (winTimer >= CELEBRATE_DUR || tap) beginSwap();
+        return ScreenType::NONE;
+    }
+
+    if (phase == PH_SWAP) {
+        swapT += dt / SWAP_DUR;
+        if (swapT >= 1.0f) {
+            if (finishing) return ScreenType::LEVELSELECT;
+            phase       = PH_PLAYING;
+            origin      = targetOrigin;
+            hasOutgoing = false;
+        }
+        return ScreenType::NONE;
+    }
+
     if (paused) {
         pauseAnim += (1.0f - pauseAnim) * (1.0f - expf(-10.0f * dt));
         pauseMenu.offset.y = (1.0f - easeOutBack(pauseAnim)) * MODAL_SLIDE;
@@ -157,20 +249,6 @@ ScreenType GameScreen::update() {
         if (a == 0 || IsKeyPressed(KEY_ESCAPE)) paused = false;
         if (a == 1) { loadLevel(currentLevel); paused = false; }
         if (a == 2) return ScreenType::TITLE;
-        return ScreenType::NONE;
-    }
-
-    if (won) {
-        winAnim += (1.0f - winAnim) * (1.0f - expf(-10.0f * dt));
-        winMenu.offset.y = (1.0f - easeOutBack(winAnim)) * MODAL_SLIDE;
-        bool last = (currentLevel + 1 >= LEVEL_COUNT);
-        int a = menuUpdate(winMenu, dt);
-        if (a == 0) {
-            if (last) return ScreenType::LEVELSELECT;
-            currentLevel++;
-            loadLevel(currentLevel);
-        }
-        if (a == 1) return ScreenType::LEVELSELECT;
         return ScreenType::NONE;
     }
 
@@ -270,13 +348,68 @@ void GameScreen::drawPauseButton() {
     DrawTextPro(f, "Pause", { cx, cy }, { m.x / 2, m.y / 2 }, angle, fs, spacing, INK);
 }
 
+void GameScreen::drawStaticBoard(const BoardState& b, Vector2 org) {
+    for (int i = 0; i < b.cellCount; i++) {
+        const Cell& cell = b.cells[i];
+        if (!cell.exists) continue;
+        Vector2 c = hexToPixel(cell.pos, org);
+        if (cell.value > 0 || cell.isStone) {
+            drawHexTile(c, 1.0f, WHITE);
+            if (cell.value > 0)
+                titleDrawCenteredAt(TextFormat("%d", cell.value), c.x, c.y, HEX_SIZE * 0.85f, INK);
+        }
+        if (cell.isGoal) drawFlag(c);
+    }
+}
+
+void GameScreen::drawConfetti() {
+    for (int i = 0; i < confettiCount; i++) {
+        const Confetti& p = confetti[i];
+        if (p.life <= 0) continue;
+        float a    = clamp01(p.life / CONFETTI_LIFE);
+        float half = 6.0f;
+        float rad  = p.rot * D2R;
+        Vector2 d  = { cosf(rad), sinf(rad) };
+        DrawLineEx({ p.pos.x - d.x * half, p.pos.y - d.y * half },
+                   { p.pos.x + d.x * half, p.pos.y + d.y * half },
+                   3.0f, Fade(p.col, a));
+    }
+}
+
+void GameScreen::drawPraise(float alpha, float yUp) {
+    float scale = easeOutBack(clamp01(winTimer / PRAISE_IN));
+    if (scale < 0.02f || alpha <= 0.0f) return;
+
+    float fs      = 64.0f * scale;
+    float spacing = fs * 0.04f;
+    float idle    = sinf((float)GetTime() * 4.0f) * 2.0f;
+    float rot     = praiseRot + idle;
+
+    Font f = titleFont();
+    Vector2 m   = MeasureTextEx(f, praiseText, fs, spacing);
+    Vector2 pos = { SCREEN_WIDTH / 2.0f, 185.0f - yUp };
+    DrawTextPro(f, praiseText, pos, { m.x / 2, m.y / 2 }, rot, fs, spacing, Fade(HEXRED, alpha));
+}
+
 void GameScreen::draw() {
     ClearBackground(PAPER);
+
+    if (phase == PH_SWAP) {
+        float e = easeOutQuad(clamp01(swapT));
+        if (hasOutgoing)
+            drawStaticBoard(outgoing, { outOrigin.x - e * SWAP_DIST, outOrigin.y });
+        if (!finishing)
+            drawStaticBoard(board, { targetOrigin.x + (1.0f - e) * SWAP_DIST, targetOrigin.y });
+        drawConfetti();
+        drawPraise(1.0f - clamp01(swapT), clamp01(swapT) * 120.0f);
+        return;
+    }
 
     titleDraw(TextFormat("Level %d / %d", currentLevel + 1, LEVEL_COUNT), 24, 22, 30, INK);
     int gi = goalIndex(board);
     if (gi >= 0) titleDraw(TextFormat("Target %d", board.cells[gi].goalValue), 24, 66, 22, INK);
-    titleDraw(TextFormat("Moves %d", board.movesLeft), 24, 96, 22, INK);
+    if (phase != PH_CELEBRATE)
+        titleDraw(TextFormat("Moves %d", board.movesLeft), 24, 96, 22, INK);
 
     for (int i = 0; i < board.cellCount; i++) {
         const Cell& cell = board.cells[i];
@@ -289,6 +422,17 @@ void GameScreen::draw() {
         }
         if (cell.isGoal) drawFlag(c);
         if (i == selectedIdx) DrawPolyLinesEx(c, 6, HEX_SIZE, -90.0f, 4.0f, HEXRED);
+    }
+
+    if (phase == PH_CELEBRATE) {
+        if (haloTimer > 0) {
+            float a = haloTimer / HALO_DUR;
+            float r = HEX_SIZE * (0.8f + (1.0f - a) * 1.8f);
+            DrawRing(winCenter, r - 3, r, 0, 360, 48, Fade(HEXRED, a * 0.8f));
+        }
+        drawConfetti();
+        drawPraise(1.0f, 0.0f);
+        return;
     }
 
     if (dragging && pressIdx >= 0 && board.cells[pressIdx].value > 0) {
@@ -305,10 +449,6 @@ void GameScreen::draw() {
     if (paused) {
         dimAndPanel("Paused", pauseAnim, pauseMenu.offset.y);
         menuDraw(pauseMenu);
-    } else if (won) {
-        bool last = (currentLevel + 1 >= LEVEL_COUNT);
-        dimAndPanel(last ? "You finished!" : "Solved!", winAnim, winMenu.offset.y);
-        menuDraw(winMenu);
     } else if (lost) {
         dimAndPanel("No moves left", lostAnim, lostMenu.offset.y);
         menuDraw(lostMenu);

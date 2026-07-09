@@ -2,6 +2,10 @@
 
 #include "screen.h"
 #include "ui.h"
+#include "layout.h"
+#include "editor.h"
+#include <vector>
+#include <string>
 
 class TitleScreen : public Screen {
 public:
@@ -10,6 +14,10 @@ public:
     void       draw() override;
 
 private:
-    Menu  menu;
-    float introT = 0.0f;
+    Layout                   layout;
+    Menu                     menu;
+    std::vector<std::string> ids;
+    Editor                   editor;
+    long                     mtime = 0;
+    float                    introT = 0.0f;
 };

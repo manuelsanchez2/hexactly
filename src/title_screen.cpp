@@ -3,6 +3,8 @@
 #include "gamefont.h"
 #include "tween.h"
 #include "ui.h"
+#include "layout.h"
+#include "editor.h"
 #include "raylib.h"
 
 static const float LOGO_DUR    = 0.55f;
@@ -21,22 +23,35 @@ static float introTotal(int buttonCount) {
     return last > LOGO_DUR ? last : LOGO_DUR;
 }
 
+static void drawLabel(const Layout& layout, const char* id, float dy, float alpha) {
+    const LayoutElement* e = layoutFind(layout, id);
+    if (!e) return;
+    float w = titleMeasure(e->text.c_str(), e->size).x;
+    float x = (e->align == Align::Center) ? e->x - w / 2.0f : e->x;
+    titleDraw(e->text.c_str(), x, e->y + dy, e->size, Fade(layoutColor(e->color), alpha));
+}
+
 TitleScreen::TitleScreen() {
-    menuAdd(menu, { 240, 433, 240, 58 }, "Play");
-    menuAdd(menu, { 240, 509, 240, 58 }, "Options");
-    menuAdd(menu, { 240, 583, 240, 58 }, "Quit");
+    layout = loadLayout("title");
+    menuFromLayout(menu, ids, layout);
+    mtime = layoutFileTime("title");
 }
 
 ScreenType TitleScreen::update() {
     float dt = GetFrameTime();
     introT += dt;
 
+    if (editorTick(editor, layout, menu, ids, mtime)) return ScreenType::NONE;
+
     if (introT < introTotal((int)menu.buttons.size())) return ScreenType::NONE;
 
     int a = menuUpdate(menu, dt);
-    if (a == 0) return ScreenType::LEVELSELECT;
-    if (a == 1) return ScreenType::OPTIONS;
-    if (a == 2) return ScreenType::QUIT;
+    if (a >= 0) {
+        const std::string& id = ids[a];
+        if (id == "play")    return ScreenType::LEVELSELECT;
+        if (id == "options") return ScreenType::OPTIONS;
+        if (id == "quit")    return ScreenType::QUIT;
+    }
     return ScreenType::NONE;
 }
 
@@ -48,25 +63,18 @@ void TitleScreen::draw() {
                    { 0, 0, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT },
                    { 0, 0 }, 0.0f, Fade(WHITE, 0.95f));
 
-    float logoP   = clamp01(introT / LOGO_DUR);
-    float logoOff = -(1.0f - easeOutBack(logoP)) * LOGO_FROM;
+    float logoOff = -(1.0f - easeOutBack(clamp01(introT / LOGO_DUR))) * LOGO_FROM;
+    drawLabel(layout, "title", logoOff, 1.0f);
+    drawLabel(layout, "subtitle", logoOff, 1.0f);
 
-    titleDrawCentered("HEXACTLY", 210 + logoOff, 84, INK);
-    titleDrawCentered("merge equal neighbours into one tile", 345 + logoOff, 22, INK);
-
-    float verE   = easeOutQuad(clamp01((introT - introTotal((int)menu.buttons.size())) / VER_DUR));
-    titleDraw("v.0.0.1", 622, 685 + (1.0f - verE) * VER_FROM, 16, Fade(GRAY, verE));
+    float verE = easeOutQuad(clamp01((introT - introTotal((int)menu.buttons.size())) / VER_DUR));
+    drawLabel(layout, "version", (1.0f - verE) * VER_FROM, verE);
 
     for (int i = 0; i < (int)menu.buttons.size(); i++) {
         float t = introT - BTN_START - i * BTN_STAGGER;
-        float p = clamp01(t / BTN_DUR);
-        menu.buttons[i].slideY = (1.0f - easeOutBack(p)) * BTN_FROM;
-    }
-    static int dbg = 0;
-    if (++dbg == 15) {
-        for (int i = 0; i < (int)menu.buttons.size(); i++)
-            TraceLog(LOG_WARNING, "BTN %d y=%.0f slideY=%.1f anim=%.2f introT=%.2f",
-                     i, menu.buttons[i].bounds.y, menu.buttons[i].slideY, menu.buttons[i].anim, introT);
+        menu.buttons[i].slideY = (1.0f - easeOutBack(clamp01(t / BTN_DUR))) * BTN_FROM;
     }
     menuDraw(menu);
+
+    editorDrawOverlay(editor, layout);
 }
