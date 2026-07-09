@@ -153,11 +153,50 @@ GameScreen::GameScreen() {
     if (!pr.seenRules) {
         pr.seenRules = true;
         saveProgress(pr);
-        openRules();
+        // loadLevel above may already have queued a first-time tip; don't clobber it.
+        if (!rulesActive) openRules();
     }
 }
 
 void GameScreen::openRules() {
+    ovTitle = "How to Play";
+    ovLines = {
+        "1.  Merge two equal neighbours - they double.",
+        "2.  Click two tiles, or drag one onto the other.",
+        "3.  Reach the TARGET number to win.",
+        "4.  Leftover tiles are fine.",
+        "5.  Walls block a shared edge.",
+        "6.  Portals link the two marked cells.",
+    };
+    if (!rulesMenu.buttons.empty()) rulesMenu.buttons[0].text = "Got it!";
+    presentOverlay();
+}
+
+void GameScreen::showTip(bool portal) {
+    if (portal) {
+        ovTitle = "New: Portals";
+        ovLines = {
+            "Two cells are joined by a portal.",
+            "",
+            "The marked cells count as neighbours,",
+            "so you can merge across them as if",
+            "they were touching.",
+        };
+    } else {
+        ovTitle = "New: Walls";
+        ovLines = {
+            "A wall blocks the edge between",
+            "two cells.",
+            "",
+            "Tiles on either side can't merge",
+            "across it - find another route.",
+        };
+    }
+    if (!rulesMenu.buttons.empty()) rulesMenu.buttons[0].text = "Ok!";
+    presentOverlay();
+}
+
+void GameScreen::presentOverlay() {
     rulesActive = true; rulesClosing = false; rulesAnim = 0.0f;
     rulesMenu.focus = 0; rulesMenu.kbFocus = false; rulesMenu.litPrev = -1;
     for (Button& b : rulesMenu.buttons) b.anim = 0.0f;
@@ -227,6 +266,19 @@ void GameScreen::loadLevel(int idx) {
 
     confettiCount = 0;
     haloTimer     = 0.0f;
+
+    // First-time mechanic tips: show once when a mechanic first appears,
+    // then remember it so it never interrupts a replay.
+    Progress pr = loadProgress();
+    if (board.wallCount > 0 && !pr.seenWalls) {
+        pr.seenWalls = true;
+        saveProgress(pr);
+        showTip(false);
+    } else if (board.portalCount > 0 && !pr.seenPortals) {
+        pr.seenPortals = true;
+        saveProgress(pr);
+        showTip(true);
+    }
 }
 
 void GameScreen::pushUndo() {
@@ -690,19 +742,11 @@ void GameScreen::draw() {
         DrawRectangleRec(panel, Fade(PAPER, a));
         DrawRectangleLinesEx(panel, 2, Fade(INK, a));
 
-        titleDrawCentered("How to Play", panel.y + 22, 40, Fade(INK, a));
+        titleDrawCentered(ovTitle.c_str(), panel.y + 22, 40, Fade(INK, a));
 
-        static const char* LINES[] = {
-            "1.  Merge two equal neighbours - they double.",
-            "2.  Click two tiles, or drag one onto the other.",
-            "3.  Reach the TARGET number on the star to win.",
-            "4.  Leftover tiles are fine.",
-            "5.  Portals link the two marked cells.",
-        };
-        int n = (int)(sizeof(LINES) / sizeof(LINES[0]));
         float y = panel.y + 96;
-        for (int i = 0; i < n; i++) {
-            titleDraw(LINES[i], panel.x + 34, y, 20, Fade(INK, a));
+        for (const std::string& ln : ovLines) {
+            if (!ln.empty()) titleDraw(ln.c_str(), panel.x + 34, y, 20, Fade(INK, a));
             y += 40;
         }
 

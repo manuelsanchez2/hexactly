@@ -80,6 +80,9 @@ private:
     float rulesAnim    = 0.0f;
     Menu  rulesMenu;
 
+    std::string              ovTitle;   // current overlay heading
+    std::vector<std::string> ovLines;   // current overlay body lines
+
     int     pressIdx   = -1;
     bool    dragging   = false;
     Vector2 pressStart = { 0, 0 };
@@ -88,6 +91,8 @@ private:
     int   hoverPrev = -1;
 
     void openRules();
+    void showTip(bool portal);
+    void presentOverlay();
     void closeRules();
 
     void loadLevel(int idx);

@@ -2,7 +2,9 @@
 
 struct Progress {
     unsigned long long done = 0;
-    bool seenRules = false;
+    bool seenRules   = false;
+    bool seenWalls   = false;
+    bool seenPortals = false;
 };
 
 Progress loadProgress();

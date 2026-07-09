@@ -20,6 +20,10 @@ Progress loadProgress() {
             p.done = (unsigned long long)std::stoull(val);
         } else if (key == "seen") {
             p.seenRules = (std::stoi(val) != 0);
+        } else if (key == "seenW") {
+            p.seenWalls = (std::stoi(val) != 0);
+        } else if (key == "seenP") {
+            p.seenPortals = (std::stoi(val) != 0);
         }
     }
     return p;
@@ -29,6 +33,8 @@ void saveProgress(const Progress& p) {
     std::ostringstream out;
     out << "done=" << p.done << "\n";
     out << "seen=" << (p.seenRules ? 1 : 0) << "\n";
+    out << "seenW=" << (p.seenWalls ? 1 : 0) << "\n";
+    out << "seenP=" << (p.seenPortals ? 1 : 0) << "\n";
     storageWrite("progress", out.str());
 }
 
