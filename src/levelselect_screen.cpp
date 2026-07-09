@@ -1,6 +1,7 @@
 #include "levelselect_screen.h"
 #include "config.h"
 #include "ui.h"
+#include "levels.h"
 #include "raylib.h"
 
 static const int cols = 3;
@@ -21,7 +22,7 @@ static Rectangle levelButton(int i) {
 static Rectangle backButton() { return { SCREEN_WIDTH/2.0f - 130, SCREEN_HEIGHT - 90.0f, 260, 58 }; }
 
 ScreenType LevelSelectScreen::update() {
-    for (int i = 0; i < levelCount; i++) {
+    for (int i = 0; i < LEVEL_COUNT; i++) {
         if (buttonClicked(levelButton(i))) {
             gStartLevel = i;              
             return ScreenType::GAME;      
@@ -39,7 +40,7 @@ void LevelSelectScreen::draw() {
     int titleW = MeasureText(title, titleSize);
     DrawText(title, SCREEN_WIDTH/2 - titleW/2, 70, titleSize, INK);
 
-    for (int i = 0; i < levelCount; i++) {
+    for (int i = 0; i < LEVEL_COUNT; i++) {
         drawButton(levelButton(i), TextFormat("%d", i + 1));
     }
 
