@@ -1,9 +1,8 @@
-# title.layout — saved by the in-game editor (F1).
-# See title.layout for the full format reference.
+# title.layout
 
-label  id=title align=center x=362.867 y=240.3 size=84 font=title color=ink text=HEXACTLY
-label  id=subtitle align=center x=361.187 y=341.519 size=20 font=plain color=ink text=merge equal neighbours into one tile
-button id=play x=239.312 y=433.203 w=240 h=58 text=Play
-button id=options x=240.055 y=509.371 w=240 h=58 text=Options
-button id=quit x=239.527 y=583.813 w=240 h=58 text=Quit
-label  id=version align=left x=621.949 y=690 size=16 font=title color=gray text=v.0.0.1
+label  id=title align=center x=363.633 y=227.883 size=84 font=title color=ink text=HEXACTLY
+label  id=subtitle align=center x=363.129 y=333.418 size=22 font=plain color=ink text=merge equal neighbours into one tile
+button id=play x=240 y=394.305 w=240 h=58 text=Play
+button id=options x=240 y=467.469 w=240 h=58 text=Options
+button id=quit x=239.641 y=539.801 w=240 h=58 text=Quit
+label  id=version align=left x=622 y=685 size=16 font=title color=gray text=v.0.0.1

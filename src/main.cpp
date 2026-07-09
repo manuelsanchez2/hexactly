@@ -2,6 +2,7 @@
 #include "config.h"
 #include "screen.h"
 #include "gamefont.h"
+#include "audio.h"
 
 #if defined(PLATFORM_WEB)
     #include <emscripten/emscripten.h>
@@ -14,6 +15,8 @@ static bool shouldQuit = false;
 #endif
 
 static void UpdateDrawFrame() {
+    audioUpdate();
+
     ScreenType next = current->update();
 
     if (next == ScreenType::QUIT) {
@@ -29,6 +32,13 @@ static void UpdateDrawFrame() {
     BeginDrawing();
     current->draw();
     EndDrawing();
+
+#if defined(HEX_DEV)
+    if (IsKeyPressed(KEY_S)) {
+        static int shotN = 0;
+        TakeScreenshot(TextFormat("hexactly_shot_%03d.png", shotN++));
+    }
+#endif
 }
 
 int main() {
@@ -40,6 +50,8 @@ int main() {
     ChangeDirectory(GetApplicationDirectory());
 #endif
 
+    InitAudioDevice();
+    audioInit();
     loadFonts();
 
     current = createScreen(ScreenType::TITLE);
@@ -54,6 +66,8 @@ int main() {
 #endif
 
     unloadFonts();
+    audioShutdown();
+    CloseAudioDevice();
     CloseWindow();
     return 0;
 }

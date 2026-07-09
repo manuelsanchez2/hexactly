@@ -1,31 +1,57 @@
 #include "title_screen.h"
 #include "config.h"
 #include "gamefont.h"
+#include "tween.h"
 #include "ui.h"
+#include "layout.h"
+#include "editor.h"
 #include "raylib.h"
 
-static Rectangle playButton()    { return { 240, 433, 240, 58 }; }
-static Rectangle optionsButton() { return { 240, 509, 240, 58 }; }
-static Rectangle quitButton()    { return { 240, 583, 240, 58 }; }
+static const float LOGO_DUR    = 0.55f;
+static const float LOGO_FROM   = 460.0f;
+static const float BTN_START   = 0.28f;
+static const float BTN_STAGGER = 0.12f;
+static const float BTN_DUR     = 0.50f;
+static const float BTN_FROM    = 460.0f;
+static const float VER_DUR     = 0.45f;
+static const float VER_FROM    = 60.0f;
 
-static void drawTitleButton(Rectangle r, const char *text) {
-    bool hover = CheckCollisionPointRec(GetMousePosition(), r);
+static float clamp01(float t) { return t < 0 ? 0 : (t > 1 ? 1 : t); }
 
-    Texture2D tex = primaryButtonTexture();
-    Color tint = hover ? (Color){ 235, 235, 235, 255 } : WHITE;
-    DrawTexturePro(tex, { 0, 0, (float)tex.width, (float)tex.height }, r,
-                   { 0, 0 }, 0.0f, tint);
+static float introTotal(int buttonCount) {
+    float last = BTN_START + (buttonCount > 0 ? (buttonCount - 1) : 0) * BTN_STAGGER + BTN_DUR;
+    return last > LOGO_DUR ? last : LOGO_DUR;
+}
 
-    float size = 30;
-    Vector2 m = titleMeasure(text, size);
-    titleDraw(text, r.x + r.width / 2 - m.x / 2, r.y + r.height / 2 - m.y / 2,
-              size, hover ? HEXRED : INK);
+static void drawLabel(const Layout& layout, const char* id, float dy, float alpha) {
+    const LayoutElement* e = layoutFind(layout, id);
+    if (!e) return;
+    float w = titleMeasure(e->text.c_str(), e->size).x;
+    float x = (e->align == Align::Center) ? e->x - w / 2.0f : e->x;
+    titleDraw(e->text.c_str(), x, e->y + dy, e->size, Fade(layoutColor(e->color), alpha));
+}
+
+TitleScreen::TitleScreen() {
+    layout = loadLayout("title");
+    menuFromLayout(menu, ids, layout);
+    mtime = layoutFileTime("title");
 }
 
 ScreenType TitleScreen::update() {
-    if (buttonClicked(playButton()))    return ScreenType::LEVELSELECT;
-    if (buttonClicked(optionsButton())) return ScreenType::OPTIONS;
-    if (buttonClicked(quitButton()))    return ScreenType::QUIT;
+    float dt = GetFrameTime();
+    introT += dt;
+
+    if (editorTick(editor, layout, menu, ids, mtime)) return ScreenType::NONE;
+
+    if (introT < introTotal((int)menu.buttons.size())) return ScreenType::NONE;
+
+    int a = menuUpdate(menu, dt);
+    if (a >= 0) {
+        const std::string& id = ids[a];
+        if (id == "play")    return ScreenType::LEVELSELECT;
+        if (id == "options") return ScreenType::OPTIONS;
+        if (id == "quit")    return ScreenType::QUIT;
+    }
     return ScreenType::NONE;
 }
 
@@ -35,14 +61,20 @@ void TitleScreen::draw() {
     Texture2D bg = bgTitleTexture();
     DrawTexturePro(bg, { 0, 0, (float)bg.width, (float)bg.height },
                    { 0, 0, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT },
-                   { 0, 0 }, 0.0f, WHITE);
+                   { 0, 0 }, 0.0f, Fade(WHITE, 0.95f));
 
-    titleDrawCentered("HEXACTLY", 210, 84, INK);
-    titleDrawCentered("merge equal neighbours into one tile", 345, 22, INK);
+    float logoOff = -(1.0f - easeOutBack(clamp01(introT / LOGO_DUR))) * LOGO_FROM;
+    drawLabel(layout, "title", logoOff, 1.0f);
+    drawLabel(layout, "subtitle", logoOff, 1.0f);
 
-    drawTitleButton(playButton(),    "Play");
-    drawTitleButton(optionsButton(), "Options");
-    drawTitleButton(quitButton(),    "Quit");
+    float verE = easeOutQuad(clamp01((introT - introTotal((int)menu.buttons.size())) / VER_DUR));
+    drawLabel(layout, "version", (1.0f - verE) * VER_FROM, verE);
 
-    titleDraw("v.0.0.1", 622, 685, 16, GRAY);
+    for (int i = 0; i < (int)menu.buttons.size(); i++) {
+        float t = introT - BTN_START - i * BTN_STAGGER;
+        menu.buttons[i].slideY = (1.0f - easeOutBack(clamp01(t / BTN_DUR))) * BTN_FROM;
+    }
+    menuDraw(menu);
+
+    editorDrawOverlay(editor, layout);
 }
