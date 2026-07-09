@@ -2,6 +2,7 @@
 #include "config.h"
 
 static Font      gTitle;
+static Font      gMarker;
 static Texture2D gTick;
 static Texture2D gPrimaryBtn;
 static Texture2D gSecondaryBtn;
@@ -12,6 +13,7 @@ static Texture2D gFlag;
 static Texture2D gPortalA;
 static Texture2D gPortalB;
 static Texture2D gBgTitle;
+static Texture2D gLogoSheet;
 static Texture2D gBtnInfo;
 static Texture2D gBtnPause;
 static Texture2D gBtnUndo;
@@ -27,6 +29,9 @@ void loadFonts() {
     gTitle = LoadFontEx("resources/Oliver-Regular.ttf", 96, 0, 0);
     SetTextureFilter(gTitle.texture, TEXTURE_FILTER_BILINEAR);
 
+    gMarker = LoadFontEx("resources/PermanentMarker-Regular.ttf", 96, 0, 0);
+    SetTextureFilter(gMarker.texture, TEXTURE_FILTER_BILINEAR);
+
     gTick         = loadTex("resources/tick.png");
     gPrimaryBtn   = loadTex("resources/primary-button.png");
     gSecondaryBtn = loadTex("resources/secondary-button.png");
@@ -37,6 +42,7 @@ void loadFonts() {
     gPortalA      = loadTex("resources/portal-a.png");
     gPortalB      = loadTex("resources/portal-b.png");
     gBgTitle      = loadTex("resources/bg-title.png");
+    gLogoSheet    = loadTex("resources/hexactly-spritesheet.png");
     gBtnInfo      = loadTex("resources/btn-info.png");
     gBtnPause     = loadTex("resources/btn-pause.png");
     gBtnUndo      = loadTex("resources/btn-undo.png");
@@ -47,6 +53,7 @@ void loadFonts() {
 void unloadFonts() {
     if (loaded) {
         UnloadFont(gTitle);
+        UnloadFont(gMarker);
         UnloadTexture(gTick);
         UnloadTexture(gPrimaryBtn);
         UnloadTexture(gSecondaryBtn);
@@ -57,6 +64,7 @@ void unloadFonts() {
         UnloadTexture(gPortalA);
         UnloadTexture(gPortalB);
         UnloadTexture(gBgTitle);
+        UnloadTexture(gLogoSheet);
         UnloadTexture(gBtnInfo);
         UnloadTexture(gBtnPause);
         UnloadTexture(gBtnUndo);
@@ -65,6 +73,7 @@ void unloadFonts() {
 }
 
 Font&     titleFont()              { return gTitle; }
+Font&     markerFont()             { return gMarker; }
 Texture2D tickTexture()            { return gTick; }
 Texture2D primaryButtonTexture()   { return gPrimaryBtn; }
 Texture2D secondaryButtonTexture() { return gSecondaryBtn; }
@@ -75,6 +84,7 @@ Texture2D flagGoalTexture()        { return gFlag; }
 Texture2D portalATexture()         { return gPortalA; }
 Texture2D portalBTexture()         { return gPortalB; }
 Texture2D bgTitleTexture()         { return gBgTitle; }
+Texture2D logoSheetTexture()       { return gLogoSheet; }
 Texture2D btnInfoTexture()         { return gBtnInfo; }
 Texture2D btnPauseTexture()        { return gBtnPause; }
 Texture2D btnUndoTexture()         { return gBtnUndo; }

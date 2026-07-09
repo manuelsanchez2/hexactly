@@ -42,18 +42,16 @@ _Copyright (c) 2014-2026 Ramon Santamaria ([@raysan5](https://github.com/raysan5
 
 ## Hexactly
 
-COOL IMAGE WILL COME HERE 
-<!-- ![$(Game Title)](screenshots/screenshot000.png "$(Game Title)") -->
+![Cover](screenshots/cover.png "Cover")
 
 ### Description
 
 Hexactly is a cozy, hand-drawn merge puzzle played on a hexagonal grid. Combine two
-equal neighbouring tiles and they double. Your goal: chain your merges to reach the target number
-on the goal tile and solve each level before you run out of moves! 
+equal neighbouring tiles and they double. **Your goal**: chain your merges to reach the target number on the goal tile and solve each level before you run out of moves! 
 
 ### Features
 
- - Puzzle twists: **stones** (inert blockers), **walls** (blocked edges), **portals** (link two far cells) and **cursed** tiles (unlock when you merge beside them).
+ - Puzzle twists: **walls** (blocked edges) and **portals** (link two far cells).
  - Move-limited levels that must be solved in the tiles you're given.
  - Saved progress and a level-select map that unlocks as you complete levels.
 
@@ -63,7 +61,6 @@ Mouse:
  - **Click** a tile, then an equal neighbour, to merge them
  - **Drag** a tile onto an equal neighbour to merge (guide line shows the link)
  - Click the on-screen **info**, **pause** and **undo** buttons
- - **Scroll wheel** to move through the level-select grid
 
 Keyboard:
  - **U** / **Z** — undo the last merge
@@ -74,9 +71,9 @@ Keyboard:
 
 ### Screenshots
 
-![Title screen](screenshots/title-screen.png "Title screen")
-
-![Completing a level](screenshots/level-complete.png "Completing a level")
+| S1 | S2 | S3 |
+| :---: | :---: | :---: |
+| ![Title screen](screenshots/title-screen.png "Title screen") | ![Level select](screenshots/level-select.png "Level select") | ![Level completed](screenshots/level-complete.png "Level completed") |
 
 ### Developers
 
@@ -84,7 +81,6 @@ Keyboard:
 
 ### Links
 
- - YouTube Gameplay: $(YouTube Link)
  - itch.io Release: [https://barkhallastudios.itch.io/hexactly](https://barkhallastudios.itch.io/hexactly)
 
 ### License

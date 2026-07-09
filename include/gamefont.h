@@ -6,6 +6,7 @@ void loadFonts();
 void unloadFonts();
 
 Font& titleFont();
+Font& markerFont();
 
 Texture2D tickTexture();
 Texture2D primaryButtonTexture();
@@ -17,6 +18,7 @@ Texture2D flagGoalTexture();
 Texture2D portalATexture();
 Texture2D portalBTexture();
 Texture2D bgTitleTexture();
+Texture2D logoSheetTexture();
 Texture2D btnInfoTexture();
 Texture2D btnPauseTexture();
 Texture2D btnUndoTexture();

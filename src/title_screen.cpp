@@ -64,7 +64,19 @@ void TitleScreen::draw() {
                    { 0, 0 }, 0.0f, Fade(WHITE, 0.95f));
 
     float logoOff = -(1.0f - easeOutBack(clamp01(introT / LOGO_DUR))) * LOGO_FROM;
-    drawLabel(layout, "title", logoOff, 1.0f);
+
+    const LayoutElement* lt = layoutFind(layout, "title");
+    if (lt) {
+        Texture2D logo = logoSheetTexture();
+        float fw = logo.width / 4.0f;
+        int frame = ((int)(GetTime() / 0.2)) % 4;
+        float dh = lt->size * 2.0f;
+        float dw = dh * fw / logo.height;
+        float cx = lt->x;
+        float cy = lt->y + lt->size * 0.5f + logoOff;
+        DrawTexturePro(logo, { frame * fw, 0, fw, (float)logo.height },
+                       { cx - dw / 2, cy - dh / 2, dw, dh }, { 0, 0 }, 0.0f, WHITE);
+    }
     drawLabel(layout, "subtitle", logoOff, 1.0f);
 
     float verE = easeOutQuad(clamp01((introT - introTotal((int)menu.buttons.size())) / VER_DUR));

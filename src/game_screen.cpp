@@ -698,7 +698,6 @@ void GameScreen::draw() {
             "3.  Reach the TARGET number on the star to win.",
             "4.  Leftover tiles are fine.",
             "5.  Portals link the two marked cells.",
-            "6.  Cursed tiles unlock when you merge beside them.",
         };
         int n = (int)(sizeof(LINES) / sizeof(LINES[0]));
         float y = panel.y + 96;

@@ -10,26 +10,19 @@ static const float LS_WOB_DUR  = 0.25f;
 static const float LS_WOB_DIST = 5.0f;
 static const float LS_WOB_ROT  = 4.0f;
 
-static const int   COLS   = 5;
+static const int   COLS = 5;
 static const float CW = 100, CH = 100, GAP = 16;
 static const float STEP = CH + GAP;
-
-static const float VIEW_TOP    = 156;
-static const float VIEW_BOTTOM = SCREEN_HEIGHT - 110.0f;
-static const float VIEW_H      = VIEW_BOTTOM - VIEW_TOP;
-
-static int   rowCount()   { return (LEVEL_COUNT + COLS - 1) / COLS; }
-static float contentH()   { return rowCount() * STEP; }
-static float maxScroll()  { float m = contentH() - VIEW_H; return m > 0 ? m : 0; }
+static const float GRID_TOP = 158;
 
 static float gridStartX() {
     float gridW = COLS * CW + (COLS - 1) * GAP;
     return (SCREEN_WIDTH - gridW) / 2.0f;
 }
 
-static Rectangle cellRect(int i, float scroll) {
+static Rectangle cellRect(int i) {
     int col = i % COLS, row = i / COLS;
-    return { gridStartX() + col * STEP, VIEW_TOP + row * STEP - scroll, CW, CH };
+    return { gridStartX() + col * STEP, GRID_TOP + row * STEP, CW, CH };
 }
 
 static void drawCheck(Rectangle r) {
@@ -63,32 +56,22 @@ ScreenType LevelSelectScreen::update() {
     int a = menuUpdate(menu, dt);
     if (a >= 0 && ids[a] == "back") return ScreenType::TITLE;
 
-    scroll -= GetMouseWheelMove() * 40.0f;
-    if (IsKeyDown(KEY_DOWN)) scroll += 300.0f * dt;
-    if (IsKeyDown(KEY_UP))   scroll -= 300.0f * dt;
-    if (scroll < 0) scroll = 0;
-    if (scroll > maxScroll()) scroll = maxScroll();
-
     for (int i = 0; i < LEVEL_COUNT; i++) if (wob[i] > 0) wob[i] -= dt;
     {
         int hi = -1;
         Vector2 m = GetMousePosition();
-        if (m.y >= VIEW_TOP && m.y <= VIEW_BOTTOM) {
-            for (int i = 0; i < LEVEL_COUNT; i++) {
-                if (i <= unlocked && CheckCollisionPointRec(m, cellRect(i, scroll))) { hi = i; break; }
-            }
+        for (int i = 0; i < LEVEL_COUNT; i++) {
+            if (i <= unlocked && CheckCollisionPointRec(m, cellRect(i))) { hi = i; break; }
         }
         if (hi != hoverPrev) { if (hi >= 0) wob[hi] = LS_WOB_DUR; hoverPrev = hi; }
     }
 
     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
         Vector2 m = GetMousePosition();
-        if (m.y >= VIEW_TOP && m.y <= VIEW_BOTTOM) {
-            for (int i = 0; i < LEVEL_COUNT; i++) {
-                if (i <= unlocked && CheckCollisionPointRec(m, cellRect(i, scroll))) {
-                    gStartLevel = i;
-                    return ScreenType::GAME;
-                }
+        for (int i = 0; i < LEVEL_COUNT; i++) {
+            if (i <= unlocked && CheckCollisionPointRec(m, cellRect(i))) {
+                gStartLevel = i;
+                return ScreenType::GAME;
             }
         }
     }
@@ -103,19 +86,16 @@ void LevelSelectScreen::draw() {
     int doneCount = 0;
     for (int i = 0; i < LEVEL_COUNT; i++) if (levelDone(progress, i)) doneCount++;
     const char* prog = TextFormat("Completed  %d / %d", doneCount, LEVEL_COUNT);
-    titleDraw(prog, SCREEN_WIDTH/2 - titleMeasure(prog, 22).x/2, 116, 22, INK);
+    titleDraw(prog, SCREEN_WIDTH/2 - titleMeasure(prog, 22).x/2, 120, 22, INK);
 
     Vector2 mouse = GetMousePosition();
 
-    BeginScissorMode(0, (int)VIEW_TOP, SCREEN_WIDTH, (int)VIEW_H);
     for (int i = 0; i < LEVEL_COUNT; i++) {
-        Rectangle r = cellRect(i, scroll);
-        if (r.y + r.height < VIEW_TOP || r.y > VIEW_BOTTOM) continue;
+        Rectangle r = cellRect(i);
 
         bool done     = levelDone(progress, i);
         bool playable = (i <= unlocked);
-        bool hover    = playable && CheckCollisionPointRec(mouse, r) &&
-                        mouse.y >= VIEW_TOP && mouse.y <= VIEW_BOTTOM;
+        bool hover    = playable && CheckCollisionPointRec(mouse, r);
 
         Texture2D sq = levelSquareTexture();
         Rectangle src = { 0, 0, (float)sq.width, (float)sq.height };
@@ -137,16 +117,6 @@ void LevelSelectScreen::draw() {
                        { r.width / 2, r.height / 2 }, rot, tint);
         titleDrawCenteredAtRot(TextFormat("%d", i + 1), cx, cy, 40, rot, INK);
         if (done) { Rectangle tr = { r.x + tx, r.y, r.width, r.height }; drawCheck(tr); }
-    }
-    EndScissorMode();
-
-    if (maxScroll() > 0) {
-        float trackX = SCREEN_WIDTH - 14.0f;
-        float trackH = VIEW_H;
-        DrawRectangle((int)trackX, (int)VIEW_TOP, 6, (int)trackH, (Color){ 220, 218, 210, 255 });
-        float thumbH = trackH * (VIEW_H / contentH());
-        float thumbY = VIEW_TOP + (scroll / maxScroll()) * (trackH - thumbH);
-        DrawRectangle((int)trackX, (int)thumbY, 6, (int)thumbH, (Color){ 150, 148, 140, 255 });
     }
 
     menuDraw(menu);

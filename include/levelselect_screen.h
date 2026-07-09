@@ -17,7 +17,6 @@ public:
 private:
     Progress progress;
     int      unlocked;
-    float    scroll = 0.0f;
 
     Layout                   layout;
     Menu                     menu;

@@ -19,4 +19,11 @@ private:
     std::vector<std::string> ids;
     Editor                   editor;
     long                     mtime = 0;
+
+    bool  confirming   = false;
+    float confirmAnim  = 0.0f;
+    Menu  confirmMenu;
+    float clearedTimer = 0.0f;
+
+    void openConfirm();
 };

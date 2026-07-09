@@ -23,6 +23,7 @@ DEPS = $(OBJS:.o=.d)
 
 $(TARGET): $(OBJS)
 	$(CXX) $(OBJS) -o $(TARGET) $(LDFLAGS)
+	rm -rf ./resources
 	cp -R src/resources ./resources
 
 %.o: %.cpp
