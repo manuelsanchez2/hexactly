@@ -3,11 +3,15 @@
 #include "config.h"
 #include "gamefont.h"
 #include "levels.h"
+#include "tween.h"
 #include "ui.h"
 #include "raylib.h"
+#include <cmath>
 
 static const float BOARD_DROP = 110.0f;
 static const float TILE_SCALE = 96.0f / 46.0f;
+static const float MODAL_SLIDE = 360.0f;
+static const float PAUSE_WOB_DUR = 0.25f;
 
 static void drawHexTile(Vector2 c, float scale, Color tint) {
     Texture2D t = hexTileTexture();
@@ -28,13 +32,45 @@ static Rectangle pauseBtn()   { return { SCREEN_WIDTH - 130.0f, 20, 110, 44 }; }
 static Rectangle modalPanel() { return { SCREEN_WIDTH / 2.0f - 160, SCREEN_HEIGHT / 2.0f - 150, 320, 300 }; }
 static Rectangle mBtn(int i)  { return { SCREEN_WIDTH / 2.0f - 120, SCREEN_HEIGHT / 2.0f - 90 + i * 70.0f, 240, 54 }; }
 
-static void dimAndPanel(const char *title) {
-    DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Fade(BLACK, 0.5f));
+static void dimAndPanel(const char *title, float alpha, float dy) {
+    DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Fade(BLACK, 0.5f * alpha));
     Rectangle p = modalPanel();
-    DrawRectangleRec(p, PAPER);
-    DrawRectangleLinesEx(p, 2, INK);
-    titleDrawCentered(title, p.y + 26, 40, INK);
+    p.y += dy;
+    DrawRectangleRec(p, Fade(PAPER, alpha));
+    DrawRectangleLinesEx(p, 2, Fade(INK, alpha));
+    titleDrawCentered(title, p.y + 26, 40, Fade(INK, alpha));
 }
+
+GameScreen::GameScreen() {
+    menuAdd(pauseMenu, mBtn(0), "Resume");
+    menuAdd(pauseMenu, mBtn(1), "Restart");
+    menuAdd(pauseMenu, mBtn(2), "Main Menu");
+
+    menuAdd(winMenu, mBtn(0), "Next Level");
+    menuAdd(winMenu, mBtn(1), "Levels");
+
+    menuAdd(lostMenu, mBtn(0), "Restart");
+    menuAdd(lostMenu, mBtn(1), "Main Menu");
+}
+
+static void resetMenu(Menu &m, float &anim) {
+    anim = 0.0f;
+    m.focus = 0;
+    m.kbFocus = false;
+    m.litPrev = -1;
+    m.offset = { 0, 0 };
+    for (Button &b : m.buttons) { b.anim = 0.0f; b.wob = 0.0f; }
+}
+
+void GameScreen::openPause() { resetMenu(pauseMenu, pauseAnim); }
+
+void GameScreen::openWin() {
+    bool last = (currentLevel + 1 >= LEVEL_COUNT);
+    winMenu.buttons[0].text = last ? "Back to Levels" : "Next Level";
+    resetMenu(winMenu, winAnim);
+}
+
+void GameScreen::openLost() { resetMenu(lostMenu, lostAnim); }
 
 void GameScreen::loadLevel(int idx) {
     const LevelDef& L = LEVELS[idx];
@@ -87,6 +123,8 @@ void GameScreen::loadLevel(int idx) {
     origin = (Vector2){ ox, oy };
 
     selectedIdx = -1;
+    pressIdx    = -1;
+    dragging    = false;
     won  = false;
     lost = false;
 }
@@ -97,8 +135,8 @@ void GameScreen::doMerge(int fromIdx, int toIdx) {
     board.movesLeft--;
     selectedIdx = -1;
 
-    if (isWon(board)) won = true;
-    else if (board.movesLeft <= 0 || !anyLegalMove(board)) lost = true;
+    if (isWon(board)) { won = true; openWin(); }
+    else if (board.movesLeft <= 0 || !anyLegalMove(board)) { lost = true; openLost(); }
 }
 
 ScreenType GameScreen::update() {
@@ -110,52 +148,126 @@ ScreenType GameScreen::update() {
         started = true;
     }
 
+    float dt = GetFrameTime();
+
     if (paused) {
-        if (buttonClicked(mBtn(0)) || IsKeyPressed(KEY_ESCAPE)) paused = false;
-        if (buttonClicked(mBtn(1))) { loadLevel(currentLevel); paused = false; }
-        if (buttonClicked(mBtn(2))) return ScreenType::TITLE;
+        pauseAnim += (1.0f - pauseAnim) * (1.0f - expf(-10.0f * dt));
+        pauseMenu.offset.y = (1.0f - easeOutBack(pauseAnim)) * MODAL_SLIDE;
+        int a = menuUpdate(pauseMenu, dt);
+        if (a == 0 || IsKeyPressed(KEY_ESCAPE)) paused = false;
+        if (a == 1) { loadLevel(currentLevel); paused = false; }
+        if (a == 2) return ScreenType::TITLE;
         return ScreenType::NONE;
     }
 
     if (won) {
+        winAnim += (1.0f - winAnim) * (1.0f - expf(-10.0f * dt));
+        winMenu.offset.y = (1.0f - easeOutBack(winAnim)) * MODAL_SLIDE;
         bool last = (currentLevel + 1 >= LEVEL_COUNT);
-        if (buttonClicked(mBtn(0))) {
+        int a = menuUpdate(winMenu, dt);
+        if (a == 0) {
             if (last) return ScreenType::LEVELSELECT;
             currentLevel++;
             loadLevel(currentLevel);
         }
-        if (buttonClicked(mBtn(1))) return ScreenType::LEVELSELECT;
+        if (a == 1) return ScreenType::LEVELSELECT;
         return ScreenType::NONE;
     }
 
     if (lost) {
-        if (buttonClicked(mBtn(0))) loadLevel(currentLevel);
-        if (buttonClicked(mBtn(1))) return ScreenType::TITLE;
+        lostAnim += (1.0f - lostAnim) * (1.0f - expf(-10.0f * dt));
+        lostMenu.offset.y = (1.0f - easeOutBack(lostAnim)) * MODAL_SLIDE;
+        int a = menuUpdate(lostMenu, dt);
+        if (a == 0) loadLevel(currentLevel);
+        if (a == 1) return ScreenType::TITLE;
         return ScreenType::NONE;
     }
 
-    if (IsKeyPressed(KEY_ESCAPE) || buttonClicked(pauseBtn())) {
+    Vector2 mouse = GetMousePosition();
+    bool overPause = CheckCollisionPointRec(mouse, pauseBtn());
+
+    if (IsKeyPressed(KEY_ESCAPE) || (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && overPause)) {
         paused = true;
+        openPause();
         return ScreenType::NONE;
     }
 
-    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
-        Hex h = pixelToHex(GetMousePosition(), origin);
-        int idx = cellIndexAt(board, h);
-        if (idx >= 0 && board.cells[idx].value > 0 &&
-            !board.cells[idx].isStone && !board.cells[idx].isCursed) {
-            if (selectedIdx < 0)         selectedIdx = idx;
-            else if (idx == selectedIdx) selectedIdx = -1;
-            else if (board.cells[selectedIdx].value == board.cells[idx].value &&
-                     boardAdjacent(board, board.cells[selectedIdx].pos, board.cells[idx].pos))
-                doMerge(selectedIdx, idx);
-            else                         selectedIdx = idx;
-        } else {
-            selectedIdx = -1;
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !overPause) {
+        pressStart = mouse;
+        dragging   = false;
+        Hex hx = pixelToHex(mouse, origin);
+        int idx = cellIndexAt(board, hx);
+        pressIdx = (idx >= 0 && board.cells[idx].value > 0 &&
+                    !board.cells[idx].isStone && !board.cells[idx].isCursed) ? idx : -1;
+    }
+
+    if (pressIdx >= 0 && IsMouseButtonDown(MOUSE_LEFT_BUTTON) && !dragging) {
+        float dx = mouse.x - pressStart.x, dy = mouse.y - pressStart.y;
+        if (dx * dx + dy * dy > 8 * 8) {
+            dragging = true;
+            selectedIdx = pressIdx;
         }
     }
 
+    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+        Hex hx = pixelToHex(mouse, origin);
+        int target = cellIndexAt(board, hx);
+        bool targetTile = (target >= 0 && board.cells[target].value > 0 &&
+                           !board.cells[target].isStone && !board.cells[target].isCursed);
+
+        if (dragging && pressIdx >= 0) {
+            if (targetTile && target != pressIdx &&
+                board.cells[pressIdx].value == board.cells[target].value &&
+                boardAdjacent(board, board.cells[pressIdx].pos, board.cells[target].pos)) {
+                doMerge(pressIdx, target);
+            } else {
+                selectedIdx = -1;
+            }
+        } else {
+            int t = targetTile ? target : -1;
+            if (t < 0)                      selectedIdx = -1;
+            else if (selectedIdx == -1)     selectedIdx = t;
+            else if (selectedIdx == t)      selectedIdx = -1;
+            else if (board.cells[selectedIdx].value == board.cells[t].value &&
+                     boardAdjacent(board, board.cells[selectedIdx].pos, board.cells[t].pos))
+                doMerge(selectedIdx, t);
+            else                            selectedIdx = t;
+        }
+
+        pressIdx = -1;
+        dragging = false;
+    }
+
     return ScreenType::NONE;
+}
+
+void GameScreen::drawPauseButton() {
+    Rectangle r = pauseBtn();
+    float dt = GetFrameTime();
+    bool hovered = CheckCollisionPointRec(GetMousePosition(), r);
+    if (hovered && !pauseBtnHov) pauseBtnWob = PAUSE_WOB_DUR;
+    pauseBtnHov = hovered;
+
+    pauseBtnAnim += ((hovered ? 1.0f : 0.0f) - pauseBtnAnim) * (1.0f - expf(-14.0f * dt));
+    if (pauseBtnWob > 0) pauseBtnWob -= dt;
+
+    float wv    = (pauseBtnWob > 0) ? wobbleAt(1.0f - pauseBtnWob / PAUSE_WOB_DUR) : 0.0f;
+    float tx    = 2.0f * wv;
+    float angle = 2.0f * wv;
+
+    float cx = r.x + r.width  / 2.0f + tx;
+    float cy = r.y + r.height / 2.0f;
+
+    Texture2D tex = primaryButtonTexture();
+    unsigned char g = (unsigned char)(255.0f - 50.0f * pauseBtnAnim);
+    Color tint = { g, g, g, 255 };
+    DrawTexturePro(tex, { 0, 0, (float)tex.width, (float)tex.height },
+                   { cx, cy, r.width, r.height }, { r.width / 2, r.height / 2 }, angle, tint);
+
+    float fs = 24.0f, spacing = fs * 0.04f;
+    Font f = titleFont();
+    Vector2 m = MeasureTextEx(f, "Pause", fs, spacing);
+    DrawTextPro(f, "Pause", { cx, cy }, { m.x / 2, m.y / 2 }, angle, fs, spacing, INK);
 }
 
 void GameScreen::draw() {
@@ -179,21 +291,26 @@ void GameScreen::draw() {
         if (i == selectedIdx) DrawPolyLinesEx(c, 6, HEX_SIZE, -90.0f, 4.0f, HEXRED);
     }
 
-    drawButton(pauseBtn(), "Pause");
+    if (dragging && pressIdx >= 0 && board.cells[pressIdx].value > 0) {
+        Vector2 m   = GetMousePosition();
+        Vector2 src = hexToPixel(board.cells[pressIdx].pos, origin);
+        DrawLineEx(src, m, 3.0f, Fade(HEXRED, 0.35f));
+        drawHexTile(m, 0.95f, Fade(WHITE, 0.9f));
+        titleDrawCenteredAt(TextFormat("%d", board.cells[pressIdx].value),
+                            m.x, m.y, HEX_SIZE * 0.8f, INK);
+    }
+
+    drawPauseButton();
 
     if (paused) {
-        dimAndPanel("Paused");
-        drawButton(mBtn(0), "Resume");
-        drawButton(mBtn(1), "Restart");
-        drawButton(mBtn(2), "Main Menu");
+        dimAndPanel("Paused", pauseAnim, pauseMenu.offset.y);
+        menuDraw(pauseMenu);
     } else if (won) {
         bool last = (currentLevel + 1 >= LEVEL_COUNT);
-        dimAndPanel(last ? "You finished!" : "Solved!");
-        drawButton(mBtn(0), last ? "Back to Levels" : "Next Level");
-        drawButton(mBtn(1), "Levels");
+        dimAndPanel(last ? "You finished!" : "Solved!", winAnim, winMenu.offset.y);
+        menuDraw(winMenu);
     } else if (lost) {
-        dimAndPanel("No moves left");
-        drawButton(mBtn(0), "Restart");
-        drawButton(mBtn(1), "Main Menu");
+        dimAndPanel("No moves left", lostAnim, lostMenu.offset.y);
+        menuDraw(lostMenu);
     }
 }
