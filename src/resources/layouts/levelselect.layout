@@ -1,5 +1,5 @@
-# levelselect.layout — saved by the in-game editor (F1).
-# See title.layout for the full format reference.
+# levelselect.layout
 
 label  id=title align=center x=360 y=57.9102 size=52 font=title color=ink text=SELECT LEVEL
-button id=back x=240 y=636 w=240 h=56 text=Back
+button id=daily x=100 y=636 w=240 h=56 text=Daily
+button id=back x=242.039 y=636 w=240 h=56 text=Back

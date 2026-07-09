@@ -5,6 +5,11 @@ struct Progress {
     bool seenRules   = false;
     bool seenWalls   = false;
     bool seenPortals = false;
+    bool seenDailyOps = false;   // shown the operator tip on the first daily
+
+    long dailyLastDay = -1;   // epoch-day of the last daily win (-1 = never)
+    int  dailyStreak  = 0;    // consecutive-day win streak
+    int  dailyBest    = 0;    // best streak ever
 };
 
 Progress loadProgress();

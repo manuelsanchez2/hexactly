@@ -25,7 +25,7 @@ static const float CONFETTI_LIFE = 0.90f;
 static float clamp01(float t) { return t < 0 ? 0 : (t > 1 ? 1 : t); }
 
 static Rectangle pausePanel() { return { SCREEN_WIDTH/2.0f - 170, SCREEN_HEIGHT/2.0f - 140, 340, 300 }; }
-static Rectangle rulesPanel() { return { SCREEN_WIDTH/2.0f - 260, SCREEN_HEIGHT/2.0f - 210, 520, 420 }; }
+static Rectangle rulesPanel() { return { SCREEN_WIDTH/2.0f - 265, SCREEN_HEIGHT/2.0f - 240, 530, 480 }; }
 
 static Rectangle rectOf(const Layout& L, const char* id, Rectangle def) {
     const LayoutElement* e = layoutFind(L, id);
@@ -118,6 +118,15 @@ static void drawTargetBadge(int target, Vector2 c) {
     titleDrawCenteredAt(TextFormat("%d", target), c.x, c.y, 40.0f, HEXRED);
 }
 
+static const char* opGlyph(int op) {
+    switch (op) {
+        case OP_ADD2: return "+2";
+        case OP_SUB2: return "-2";
+        case OP_MUL2: return "x2";
+        default:      return "";
+    }
+}
+
 static const float ICON_WOB_DUR  = 0.25f;
 static const float ICON_WOB_DIST = 2.0f;
 static const float ICON_WOB_ROT  = 3.0f;
@@ -146,11 +155,22 @@ GameScreen::GameScreen() {
     Rectangle rp = rulesPanel();
     menuAdd(rulesMenu, { SCREEN_WIDTH/2.0f - 100, rp.y + rp.height - 66, 200, 52 }, "Got it!");
 
-    currentLevel = gStartLevel;
-    loadLevel(currentLevel);
+    daily = gDailyMode;
+    if (daily) {
+        loadDaily();
+    } else {
+        currentLevel = gStartLevel;
+        loadLevel(currentLevel);
+    }
 
     Progress pr = loadProgress();
-    if (!pr.seenRules) {
+    if (daily) {
+        if (!pr.seenDailyOps) {
+            pr.seenDailyOps = true;
+            saveProgress(pr);
+            if (!rulesActive) openRules();   // openRules explains operators when daily
+        }
+    } else if (!pr.seenRules) {
         pr.seenRules = true;
         saveProgress(pr);
         // loadLevel above may already have queued a first-time tip; don't clobber it.
@@ -159,15 +179,28 @@ GameScreen::GameScreen() {
 }
 
 void GameScreen::openRules() {
-    ovTitle = "How to Play";
-    ovLines = {
-        "1.  Merge two equal neighbours - they double.",
-        "2.  Click two tiles, or drag one onto the other.",
-        "3.  Reach the TARGET number to win.",
-        "4.  Leftover tiles are fine.",
-        "5.  Walls block a shared edge.",
-        "6.  Portals link the two marked cells.",
-    };
+    if (daily) {
+        ovTitle = "Daily: Operators";
+        ovLines = {
+            "Drag a number onto a neighbouring",
+            "operator tile to transform it:",
+            "",
+            "   x2  double        +2  add two",
+            "   -2  subtract two",
+            "",
+            "Hit the TARGET exactly to win.",
+        };
+    } else {
+        ovTitle = "How to Play";
+        ovLines = {
+            "1.  Merge two equal neighbours - they double.",
+            "2.  Click two tiles, or drag one onto the other.",
+            "3.  Reach the TARGET number to win.",
+            "4.  Leftover tiles are fine.",
+            "5.  Walls block a shared edge.",
+            "6.  Portals link the two marked cells.",
+        };
+    }
     if (!rulesMenu.buttons.empty()) rulesMenu.buttons[0].text = "Got it!";
     presentOverlay();
 }
@@ -176,23 +209,52 @@ void GameScreen::showTip(bool portal) {
     if (portal) {
         ovTitle = "New: Portals";
         ovLines = {
-            "Two cells are joined by a portal.",
+            "A portal links two far-apart cells,",
+            "each marked with a matching symbol.",
             "",
-            "The marked cells count as neighbours,",
-            "so you can merge across them as if",
-            "they were touching.",
+            "Linked cells count as neighbours - a",
+            "tile on one side can merge with a",
+            "match on the other, straight across",
+            "the gap between them.",
+            "",
+            "It reaches numbers you could never",
+            "bring together otherwise.",
         };
     } else {
         ovTitle = "New: Walls";
         ovLines = {
-            "A wall blocks the edge between",
-            "two cells.",
+            "A wall is the thick line drawn along",
+            "the shared edge between two cells.",
             "",
-            "Tiles on either side can't merge",
-            "across it - find another route.",
+            "Tiles on opposite sides can never",
+            "merge across it - even when their",
+            "numbers are a perfect match.",
+            "",
+            "There is always another way around,",
+            "so plan your route carefully.",
         };
     }
     if (!rulesMenu.buttons.empty()) rulesMenu.buttons[0].text = "Ok!";
+    presentOverlay();
+}
+
+// Shown once, after the very last level is cleared. Dismissing it returns to
+// the level-select screen.
+void GameScreen::showFinal() {
+    ovTitle = "That's all!";
+    ovLines = {
+        "Thanks for playing - I really",
+        "hope you liked it!",
+        "",
+        "Stay tuned for further updates",
+        "on the game.",
+        "",
+        "And feel free to leave me some",
+        "feedback on the itch page!",
+    };
+    if (!rulesMenu.buttons.empty()) rulesMenu.buttons[0].text = "Back to Levels";
+    endGame = true;
+    phase   = PH_DONE;
     presentOverlay();
 }
 
@@ -204,8 +266,11 @@ void GameScreen::presentOverlay() {
 
 void GameScreen::closeRules() { rulesClosing = true; }
 
-void GameScreen::loadLevel(int idx) {
-    const LevelDef& L = LEVELS[idx];
+void GameScreen::loadLevel(int idx)     { applyLevel(LEVELS[idx]); }
+void GameScreen::loadDaily()            { applyLevel(makeDaily(dailyIndex())); }
+void GameScreen::reloadCurrent()        { if (daily) loadDaily(); else loadLevel(currentLevel); }
+
+void GameScreen::applyLevel(const LevelDef& L) {
     board.cellCount = L.cellCount;
     board.movesLeft = L.moveLimit;
     for (int i = 0; i < L.cellCount; i++) {
@@ -216,6 +281,7 @@ void GameScreen::loadLevel(int idx) {
         board.cells[i].isStone   = (L.cells[i].flags & F_STONE)  != 0;
         board.cells[i].isCursed  = (L.cells[i].flags & F_CURSED) != 0;
         board.cells[i].goalValue = L.cells[i].goalValue;
+        board.cells[i].op        = L.cells[i].op;
     }
     board.wallCount = L.wallCount;
     for (int i = 0; i < L.wallCount; i++) {
@@ -320,6 +386,29 @@ void GameScreen::doMerge(int fromIdx, int toIdx) {
     checkEnd();
 }
 
+// Daily challenges only: a value tile is dragged onto a neighbouring operator
+// tile, which transforms it and is consumed (the cell becomes a plain value).
+void GameScreen::doApply(int fromIdx, int toIdx) {
+    pushUndo();
+    int v  = board.cells[fromIdx].value;
+    int nv = applyOp(board.cells[toIdx].op, v);
+    board.cells[toIdx].value   = nv;
+    board.cells[toIdx].op      = OP_NONE;   // operator consumed
+    board.cells[fromIdx].value = 0;
+    board.movesLeft--;
+
+    slideActive  = true;
+    slideFrom    = hexToPixel(board.cells[fromIdx].pos, origin);
+    slideTo      = hexToPixel(board.cells[toIdx].pos, origin);
+    slideValue   = v;                       // shows incoming value, then pops to nv
+    slideLandIdx = toIdx;
+    slideT       = 0.0f;
+
+    playMerge();
+    selectedIdx = -1;
+    checkEnd();
+}
+
 void GameScreen::checkEnd() {
     if (isWon(board)) {
         phase     = PH_CELEBRATE;
@@ -328,7 +417,16 @@ void GameScreen::checkEnd() {
         playWin();
 
         Progress p = loadProgress();
-        markLevelDone(p, currentLevel);
+        if (daily) {
+            long today = dailyEpochDay();
+            if (p.dailyLastDay != today) {            // count each day once
+                p.dailyStreak  = (p.dailyLastDay == today - 1) ? p.dailyStreak + 1 : 1;
+                p.dailyLastDay = today;
+                if (p.dailyStreak > p.dailyBest) p.dailyBest = p.dailyStreak;
+            }
+        } else {
+            markLevelDone(p, currentLevel);
+        }
         saveProgress(p);
 
         int wi = -1;
@@ -342,7 +440,7 @@ void GameScreen::checkEnd() {
         winCenter = (wi >= 0) ? hexToPixel(board.cells[wi].pos, origin)
                               : (Vector2){ SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f };
 
-        bool last = (currentLevel + 1 >= LEVEL_COUNT);
+        bool last = !daily && (currentLevel + 1 >= LEVEL_COUNT);
         static const char* WORDS[] = { "Nice!", "Great!", "Well Done!", "Sweet!", "Boom!" };
         praiseText = last ? "All done!" : WORDS[GetRandomValue(0, 4)];
         praiseRot  = (float)GetRandomValue(-6, 6);
@@ -415,7 +513,11 @@ ScreenType GameScreen::update() {
         bool tap = winTimer > 0.2f &&
                    (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) ||
                     IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ENTER));
-        if (winTimer >= CELEBRATE_DUR || tap) beginSwap();
+        if (winTimer >= CELEBRATE_DUR || tap) {
+            if (daily) return ScreenType::LEVELSELECT;   // dailies don't chain
+            if (currentLevel + 1 >= LEVEL_COUNT) showFinal();   // finished the game
+            else beginSwap();
+        }
         return ScreenType::NONE;
     }
 
@@ -443,6 +545,7 @@ ScreenType GameScreen::update() {
         rulesMenu.offset.y = (1.0f - easeOutBack(clamp01(rulesAnim))) * PAUSE_SLIDE;
         if (rulesClosing && rulesAnim < 0.02f) {
             rulesActive = false; rulesClosing = false;
+            if (endGame) { endGame = false; return ScreenType::LEVELSELECT; }
         } else {
             int a = menuUpdate(rulesMenu, dt);
             if (!rulesClosing && (a == 0 || IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE))) closeRules();
@@ -467,7 +570,7 @@ ScreenType GameScreen::update() {
 
         int a = menuUpdate(pauseMenu, dt);
         if (a == 0 || IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) paused = false;
-        if (a == 1) { loadLevel(currentLevel); paused = false; }
+        if (a == 1) { reloadCurrent(); paused = false; }
         if (a == 2) return ScreenType::LEVELSELECT;
         return ScreenType::NONE;
     }
@@ -501,7 +604,7 @@ ScreenType GameScreen::update() {
         return ScreenType::NONE;
     }
     if (IsKeyPressed(KEY_U) || IsKeyPressed(KEY_Z)) doUndo();
-    if (IsKeyPressed(KEY_R)) loadLevel(currentLevel);
+    if (IsKeyPressed(KEY_R)) reloadCurrent();
 
     bool overHud = false;
     Vector2 mouse = GetMousePosition();
@@ -533,6 +636,10 @@ ScreenType GameScreen::update() {
             bool targetTile = (target >= 0 && board.cells[target].value > 0 &&
                                !board.cells[target].isCursed);
 
+            auto isOpCell = [&](int i) {
+                return i >= 0 && board.cells[i].exists &&
+                       board.cells[i].value == 0 && board.cells[i].op != OP_NONE;
+            };
             auto legal = [&](int a, int b) {
                 return a >= 0 && b >= 0 && a != b &&
                        board.cells[a].value > 0 && board.cells[b].value > 0 &&
@@ -540,14 +647,25 @@ ScreenType GameScreen::update() {
                        board.cells[a].value == board.cells[b].value &&
                        boardAdjacent(board, board.cells[a].pos, board.cells[b].pos);
             };
+            auto legalOp = [&](int a, int b) {
+                return a >= 0 && b >= 0 && a != b &&
+                       board.cells[a].value > 0 && !board.cells[a].isCursed &&
+                       isOpCell(b) && opAllowed(board.cells[b].op, board.cells[a].value) &&
+                       boardAdjacent(board, board.cells[a].pos, board.cells[b].pos);
+            };
 
             if (dragging && pressIdx >= 0) {
                 if (legal(pressIdx, target)) {
                     doMerge(pressIdx, target);
+                } else if (legalOp(pressIdx, target)) {
+                    doApply(pressIdx, target);
                 } else {
-                    if (targetTile && target != pressIdx) playInvalid();
+                    if ((targetTile || isOpCell(target)) && target != pressIdx) playInvalid();
                     selectedIdx = -1;
                 }
+            } else if (selectedIdx >= 0 && isOpCell(target)) {
+                if (legalOp(selectedIdx, target)) doApply(selectedIdx, target);
+                else                              playInvalid();
             } else {
                 int t = targetTile ? target : -1;
                 if (t < 0)                       selectedIdx = -1;
@@ -580,9 +698,11 @@ void GameScreen::draw() {
         return;
     }
 
-    drawDynLabel(layout, "level", TextFormat("Level %d", currentLevel + 1),
+    drawDynLabel(layout, "level",
+                 daily ? TextFormat("Daily #%d", dailyIndex() + 1)
+                       : TextFormat("Level %d", currentLevel + 1),
                  { SCREEN_WIDTH / 2.0f, 54 }, 28);
-    if (phase != PH_CELEBRATE)
+    if (phase != PH_CELEBRATE && phase != PH_DONE)
         drawDynLabel(layout, "moves", TextFormat("moves left: %d", board.movesLeft),
                      { SCREEN_WIDTH / 2.0f, 90 }, 20);
 
@@ -597,6 +717,15 @@ void GameScreen::draw() {
         if (cell.isStone) {
             hexFill(c, HEX_SIZE - 3, rot, (Color){ 150, 148, 140, 255 });
             hexOutline(c, HEX_SIZE - 3, rot, 3.0f, (Color){ 90, 88, 82, 255 });
+            continue;
+        }
+
+        if (cell.value == 0 && cell.op != OP_NONE) {
+            drawHexTile(c, 1.0f, WHITE, rot);
+            titleDrawCenteredAtRot(opGlyph(cell.op), c.x, c.y,
+                                   HEX_SIZE * 0.66f, rot, HEXRED);
+            if (cell.isGoal) drawFlag(c, rot);
+            drawPortalMarkers(board, cell.pos, c);
             continue;
         }
 
@@ -737,17 +866,30 @@ void GameScreen::draw() {
 
         DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Fade(BLACK, 0.6f * a));
 
+        // Size the panel width to the widest line so rows don't trail off into
+        // dead space. Height/button stay fixed; the panel stays screen-centered.
+        const float PADX = 36.0f;
+        float maxw = titleMeasure(ovTitle.c_str(), 40).x;
+        for (const std::string& ln : ovLines) {
+            float w = titleMeasure(ln.c_str(), 20).x;
+            if (w > maxw) maxw = w;
+        }
+        float panelW = maxw + PADX * 2.0f;
+        if (panelW > 580.0f) panelW = 580.0f;
+
         Rectangle panel = rulesPanel();
+        panel.width = panelW;
+        panel.x     = SCREEN_WIDTH / 2.0f - panelW / 2.0f;
         panel.y += dy;
         DrawRectangleRec(panel, Fade(PAPER, a));
         DrawRectangleLinesEx(panel, 2, Fade(INK, a));
 
         titleDrawCentered(ovTitle.c_str(), panel.y + 22, 40, Fade(INK, a));
 
-        float y = panel.y + 96;
+        float y = panel.y + 84;
         for (const std::string& ln : ovLines) {
-            if (!ln.empty()) titleDraw(ln.c_str(), panel.x + 34, y, 20, Fade(INK, a));
-            y += 40;
+            if (!ln.empty()) titleDraw(ln.c_str(), panel.x + PADX, y, 20, Fade(INK, a));
+            y += 32;
         }
 
         menuDraw(rulesMenu);
@@ -768,6 +910,14 @@ void GameScreen::drawStaticBoard(const BoardState& b, Vector2 org) {
         if (cell.isStone) {
             hexFill(c, HEX_SIZE - 3, rot, (Color){ 150, 148, 140, 255 });
             hexOutline(c, HEX_SIZE - 3, rot, 3.0f, (Color){ 90, 88, 82, 255 });
+            continue;
+        }
+        if (cell.value == 0 && cell.op != OP_NONE) {
+            drawHexTile(c, 1.0f, WHITE, rot);
+            titleDrawCenteredAtRot(opGlyph(cell.op), c.x, c.y,
+                                   HEX_SIZE * 0.66f, rot, HEXRED);
+            if (cell.isGoal) drawFlag(c, rot);
+            drawPortalMarkers(b, cell.pos, c);
             continue;
         }
         if (cell.value == 0) {

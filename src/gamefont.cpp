@@ -17,6 +17,8 @@ static Texture2D gLogoSheet;
 static Texture2D gBtnInfo;
 static Texture2D gBtnPause;
 static Texture2D gBtnUndo;
+static Texture2D gBtnDaily;
+static Texture2D gBtnDailyTick;
 static bool      loaded = false;
 
 static Texture2D loadTex(const char *path) {
@@ -46,6 +48,8 @@ void loadFonts() {
     gBtnInfo      = loadTex("resources/btn-info.png");
     gBtnPause     = loadTex("resources/btn-pause.png");
     gBtnUndo      = loadTex("resources/btn-undo.png");
+    gBtnDaily     = loadTex("resources/btn-daily.png");
+    gBtnDailyTick = loadTex("resources/btn-daily-tick.png");
 
     loaded = true;
 }
@@ -68,6 +72,8 @@ void unloadFonts() {
         UnloadTexture(gBtnInfo);
         UnloadTexture(gBtnPause);
         UnloadTexture(gBtnUndo);
+        UnloadTexture(gBtnDaily);
+        UnloadTexture(gBtnDailyTick);
     }
     loaded = false;
 }
@@ -88,6 +94,8 @@ Texture2D logoSheetTexture()       { return gLogoSheet; }
 Texture2D btnInfoTexture()         { return gBtnInfo; }
 Texture2D btnPauseTexture()        { return gBtnPause; }
 Texture2D btnUndoTexture()         { return gBtnUndo; }
+Texture2D btnDailyTexture()        { return gBtnDaily; }
+Texture2D btnDailyTickTexture()    { return gBtnDailyTick; }
 
 static float spacingFor(float size) { return size * 0.04f; }
 

@@ -32,6 +32,23 @@ static void drawCheck(Rectangle r) {
     DrawTexturePro(t, { 0, 0, (float)t.width, (float)t.height }, dst, { 0, 0 }, 0.0f, WHITE);
 }
 
+// When the daily feature flag is off, drop the daily button so it is never
+// drawn or clickable. Called after every menu (re)build, since the layout
+// editor rebuilds the menu on live-reload.
+static void applyFeatureFlags(Menu& menu, std::vector<std::string>& ids) {
+#if !FEATURE_DAILY
+    for (int i = 0; i < (int)ids.size(); i++) {
+        if (ids[i] == "daily") {
+            menu.buttons.erase(menu.buttons.begin() + i);
+            ids.erase(ids.begin() + i);
+            break;
+        }
+    }
+#else
+    (void)menu; (void)ids;
+#endif
+}
+
 static void drawLock(Rectangle r) {
     float cx = r.x + r.width/2;
     float bodyW = r.width*0.34f, bodyH = r.height*0.26f;
@@ -46,15 +63,33 @@ LevelSelectScreen::LevelSelectScreen() {
     layout = loadLayout("levelselect");
     menuFromLayout(menu, ids, layout);
     mtime = layoutFileTime("levelselect");
+
+#if FEATURE_DAILY
+    // Label the daily button with today's challenge number.
+    for (int i = 0; i < (int)ids.size(); i++)
+        if (ids[i] == "daily")
+            menu.buttons[i].text = TextFormat("Daily #%d", dailyIndex() + 1);
+#endif
+    applyFeatureFlags(menu, ids);
 }
 
 ScreenType LevelSelectScreen::update() {
     float dt = GetFrameTime();
 
     if (editorTick(editor, layout, menu, ids, mtime)) return ScreenType::NONE;
+    applyFeatureFlags(menu, ids);   // keep daily hidden across layout live-reloads
 
     int a = menuUpdate(menu, dt);
-    if (a >= 0 && ids[a] == "back") return ScreenType::TITLE;
+    if (a >= 0 && ids[a] == "back")  return ScreenType::TITLE;
+#if FEATURE_DAILY
+    if (a >= 0 && ids[a] == "daily") {
+        // Already solved today's daily? The button is a no-op (shows a tick).
+        if (progress.dailyLastDay != dailyEpochDay()) {
+            gDailyMode = true;
+            return ScreenType::GAME;
+        }
+    }
+#endif
 
     for (int i = 0; i < LEVEL_COUNT; i++) if (wob[i] > 0) wob[i] -= dt;
     {
@@ -71,6 +106,7 @@ ScreenType LevelSelectScreen::update() {
         for (int i = 0; i < LEVEL_COUNT; i++) {
             if (i <= unlocked && CheckCollisionPointRec(m, cellRect(i))) {
                 gStartLevel = i;
+                gDailyMode  = false;
                 return ScreenType::GAME;
             }
         }
@@ -87,6 +123,16 @@ void LevelSelectScreen::draw() {
     for (int i = 0; i < LEVEL_COUNT; i++) if (levelDone(progress, i)) doneCount++;
     const char* prog = TextFormat("Completed  %d / %d", doneCount, LEVEL_COUNT);
     titleDraw(prog, SCREEN_WIDTH/2 - titleMeasure(prog, 22).x/2, 120, 22, INK);
+
+#if FEATURE_DAILY
+    // Daily streak, shown only while it's still alive (won today or yesterday).
+    long today = dailyEpochDay();
+    if (progress.dailyStreak > 0 &&
+        (progress.dailyLastDay == today || progress.dailyLastDay == today - 1)) {
+        const char* streak = TextFormat("Daily streak: %d", progress.dailyStreak);
+        titleDraw(streak, SCREEN_WIDTH/2 - titleMeasure(streak, 18).x/2, 610, 18, HEXRED);
+    }
+#endif
 
     Vector2 mouse = GetMousePosition();
 
@@ -120,6 +166,27 @@ void LevelSelectScreen::draw() {
     }
 
     menuDraw(menu);
+
+    // Icon just before the daily button's title: plain badge normally,
+    // ticked badge once today's challenge is solved.
+#if FEATURE_DAILY
+    {
+        bool doneToday = (progress.dailyLastDay == dailyEpochDay());
+        for (int i = 0; i < (int)ids.size(); i++) {
+            if (ids[i] != "daily") continue;
+            Rectangle rb = menu.buttons[i].bounds;
+            float ts     = titleMeasure(menu.buttons[i].text.c_str(), 24).x;
+            float cx     = rb.x + rb.width / 2.0f;
+            float cy     = rb.y + rb.height / 2.0f;
+            float sz     = 30.0f;
+            float ix     = cx - ts / 2.0f - sz - 8.0f;   // immediately left of the text
+            Texture2D ic = doneToday ? btnDailyTickTexture() : btnDailyTexture();
+            DrawTexturePro(ic, { 0, 0, (float)ic.width, (float)ic.height },
+                           { ix, cy - sz / 2.0f, sz, sz }, { 0, 0 }, 0.0f, WHITE);
+            break;
+        }
+    }
+#endif
 
     editorDrawOverlay(editor, layout);
 }
