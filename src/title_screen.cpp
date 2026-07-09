@@ -1,16 +1,29 @@
 #include "title_screen.h"
 #include "config.h"
+#include "gamefont.h"
 #include "ui.h"
 #include "raylib.h"
 
-static Rectangle playButton()    { return { SCREEN_WIDTH/2.0f - 130, 300, 260, 58 }; }
-static Rectangle levelsButton()  { return { SCREEN_WIDTH/2.0f - 130, 372, 260, 58 }; }
-static Rectangle optionsButton() { return { SCREEN_WIDTH/2.0f - 130, 444, 260, 58 }; }
-static Rectangle quitButton()    { return { SCREEN_WIDTH/2.0f - 130, 516, 260, 58 }; }
+static Rectangle playButton()    { return { 240, 433, 240, 58 }; }
+static Rectangle optionsButton() { return { 240, 509, 240, 58 }; }
+static Rectangle quitButton()    { return { 240, 583, 240, 58 }; }
+
+static void drawTitleButton(Rectangle r, const char *text) {
+    bool hover = CheckCollisionPointRec(GetMousePosition(), r);
+
+    Texture2D tex = primaryButtonTexture();
+    Color tint = hover ? (Color){ 235, 235, 235, 255 } : WHITE;
+    DrawTexturePro(tex, { 0, 0, (float)tex.width, (float)tex.height }, r,
+                   { 0, 0 }, 0.0f, tint);
+
+    float size = 30;
+    Vector2 m = titleMeasure(text, size);
+    titleDraw(text, r.x + r.width / 2 - m.x / 2, r.y + r.height / 2 - m.y / 2,
+              size, hover ? HEXRED : INK);
+}
 
 ScreenType TitleScreen::update() {
-    if (buttonClicked(playButton()))    return ScreenType::GAME;
-    if (buttonClicked(levelsButton()))  return ScreenType::LEVELSELECT;
+    if (buttonClicked(playButton()))    return ScreenType::LEVELSELECT;
     if (buttonClicked(optionsButton())) return ScreenType::OPTIONS;
     if (buttonClicked(quitButton()))    return ScreenType::QUIT;
     return ScreenType::NONE;
@@ -19,16 +32,17 @@ ScreenType TitleScreen::update() {
 void TitleScreen::draw() {
     ClearBackground(PAPER);
 
-    const char *title = "HEXACTLY";
-    int titleSize = 88;
-    int titleW = MeasureText(title, titleSize);
-    DrawText(title, SCREEN_WIDTH/2 - titleW/2, 150, titleSize, INK);
+    Texture2D bg = bgTitleTexture();
+    DrawTexturePro(bg, { 0, 0, (float)bg.width, (float)bg.height },
+                   { 0, 0, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT },
+                   { 0, 0 }, 0.0f, WHITE);
 
-    // A small red underline flourish for the doodle feel.
-    DrawRectangle(SCREEN_WIDTH/2 - titleW/2, 150 + titleSize + 6, titleW, 6, HEXRED);
+    titleDrawCentered("HEXACTLY", 210, 84, INK);
+    titleDrawCentered("merge equal neighbours into one tile", 345, 22, INK);
 
-    drawButton(playButton(),    "Play");
-    drawButton(levelsButton(),  "Level Select");
-    drawButton(optionsButton(), "Options");
-    drawButton(quitButton(),    "Quit");
+    drawTitleButton(playButton(),    "Play");
+    drawTitleButton(optionsButton(), "Options");
+    drawTitleButton(quitButton(),    "Quit");
+
+    titleDraw("v.0.0.1", 622, 685, 16, GRAY);
 }

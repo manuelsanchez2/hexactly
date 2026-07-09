@@ -17,6 +17,7 @@ OBJS = $(SRCS:.cpp=.o)
 
 $(TARGET): $(OBJS)
 	$(CXX) $(OBJS) -o $(TARGET) $(LDFLAGS)
+	cp -R src/resources ./resources
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
@@ -26,5 +27,6 @@ run: $(TARGET)
 
 clean:
 	rm -f $(TARGET) src/*.o
+	rm -rf ./resources
 
 .PHONY: run clean

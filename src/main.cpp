@@ -1,6 +1,7 @@
 #include "raylib.h"
 #include "config.h"
 #include "screen.h"
+#include "gamefont.h"
 
 #if defined(PLATFORM_WEB)
     #include <emscripten/emscripten.h>
@@ -35,6 +36,12 @@ int main() {
 
     SetExitKey(KEY_NULL);
 
+#if !defined(PLATFORM_WEB)
+    ChangeDirectory(GetApplicationDirectory());
+#endif
+
+    loadFonts();
+
     current = createScreen(ScreenType::TITLE);
 
 #if defined(PLATFORM_WEB)
@@ -46,6 +53,7 @@ int main() {
     }
 #endif
 
+    unloadFonts();
     CloseWindow();
     return 0;
 }

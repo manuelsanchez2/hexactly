@@ -40,6 +40,9 @@
 /hexactly
 /src/hexactly
 
+# Resources copied next to the root binary by the root Makefile (dev convenience)
+/resources
+
 # Debug files
 *.dSYM/
 *.su

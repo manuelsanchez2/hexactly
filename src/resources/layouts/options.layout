@@ -1,0 +1,11 @@
+# options.layout — Options screen layout.
+# The "Music: NN" / "SFX: NN" numbers are dynamic (they follow the volume) so
+# they stay in code; only the static header + the buttons live here.
+# See title.layout for the format reference.
+
+label  id=title align=center x=360 y=130 size=48 font=plain color=ink text=Options
+button id=mus_minus x=210 y=250 w=56 h=56 text=-
+button id=mus_plus  x=454 y=250 w=56 h=56 text=+
+button id=sfx_minus x=210 y=350 w=56 h=56 text=-
+button id=sfx_plus  x=454 y=350 w=56 h=56 text=+
+button id=back      x=240 y=460 w=240 h=56 text=Back
