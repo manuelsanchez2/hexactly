@@ -79,6 +79,31 @@
             saveAs(blob, localFSname);
         }
     </script>
+    <script type='text/javascript'>
+        // iOS/Safari Web Audio unlock. The AudioContext raylib (miniaudio)
+        // creates starts "suspended" and only makes sound after a real user
+        // gesture inside the page. Capture it and resume on first interaction.
+        // (NOTE: this cannot override the hardware Ring/Silent switch on iOS.)
+        (function () {
+            var Native = window.AudioContext || window.webkitAudioContext;
+            if (!Native) return;
+            var made = [];
+            function Patched() {
+                var ctx = Reflect.construct(Native, arguments, Patched);
+                made.push(ctx);
+                return ctx;
+            }
+            Patched.prototype = Native.prototype;
+            window.AudioContext = Patched;
+            if (window.webkitAudioContext) window.webkitAudioContext = Patched;
+            function resume() {
+                made.forEach(function (c) { if (c.state === 'suspended') c.resume(); });
+            }
+            ['touchstart', 'touchend', 'mousedown', 'keydown', 'click'].forEach(function (evt) {
+                document.addEventListener(evt, resume, true);
+            });
+        })();
+    </script>
     </head>
     <body>
         <canvas class=emscripten id=canvas oncontextmenu=event.preventDefault() tabindex=-1></canvas>
