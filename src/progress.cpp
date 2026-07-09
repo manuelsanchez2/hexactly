@@ -2,10 +2,27 @@
 #include <cstdlib>
 #include <fstream>
 #include <string>
-#include <filesystem>
+#if defined(_WIN32)
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
 
-namespace fs = std::filesystem;
 static const char* APP_FOLDER = "Hexactly";
+
+static void makeDir(const std::string& p) {
+#if defined(_WIN32)
+    _mkdir(p.c_str());
+#else
+    mkdir(p.c_str(), 0755);
+#endif
+}
+
+static void ensureDir(const std::string& path) {
+    for (size_t i = 1; i < path.size(); i++)
+        if (path[i] == '/') makeDir(path.substr(0, i));
+    makeDir(path);
+}
 
 static std::string baseDataDir() {
 #if defined(_WIN32)
@@ -24,8 +41,7 @@ static std::string baseDataDir() {
 
 static std::string savePath() {
     std::string dir = baseDataDir() + "/" + APP_FOLDER;
-    std::error_code ec;
-    fs::create_directories(dir, ec);
+    ensureDir(dir);
     return dir + "/progress.txt";
 }
 
