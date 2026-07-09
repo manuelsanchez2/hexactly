@@ -1,14 +1,10 @@
 #include "audio.h"
+#include "storage.h"
 #include "raylib.h"
 #include <cmath>
 #include <cstdlib>
-#include <fstream>
+#include <sstream>
 #include <string>
-#if defined(_WIN32)
-#include <direct.h>
-#else
-#include <sys/stat.h>
-#endif
 
 static const int SR = 44100;
 
@@ -74,40 +70,10 @@ void audioInit() {
     PlayMusicStream(music);
 }
 
-static void makeDir(const std::string& p) {
-#if defined(_WIN32)
-    _mkdir(p.c_str());
-#else
-    mkdir(p.c_str(), 0755);
-#endif
-}
-
-static void ensureDir(const std::string& path) {
-    for (size_t i = 1; i < path.size(); i++)
-        if (path[i] == '/') makeDir(path.substr(0, i));
-    makeDir(path);
-}
-
-static std::string settingsPath() {
-    std::string base;
-#if defined(_WIN32)
-    const char* ad = std::getenv("APPDATA"); base = ad ? ad : ".";
-#elif defined(__APPLE__)
-    const char* h = std::getenv("HOME");
-    base = h ? std::string(h) + "/Library/Application Support" : ".";
-#else
-    const char* x = std::getenv("XDG_DATA_HOME");
-    if (x) base = x;
-    else { const char* h = std::getenv("HOME"); base = h ? std::string(h) + "/.local/share" : "."; }
-#endif
-    std::string dir = base + "/Hexactly";
-    ensureDir(dir);
-    return dir + "/settings.txt";
-}
-
 void audioLoadSettings() {
-    std::ifstream in(settingsPath());
-    if (!in) return;
+    std::string data = storageRead("settings");
+    if (data.empty()) return;
+    std::istringstream in(data);
     std::string line;
     while (std::getline(in, line)) {
         auto eq = line.find('=');
@@ -120,10 +86,10 @@ void audioLoadSettings() {
 }
 
 void audioSaveSettings() {
-    std::ofstream out(settingsPath());
-    if (!out) return;
+    std::ostringstream out;
     out << "music=" << musicVol << "\n";
     out << "sfx="   << sfxVol   << "\n";
+    storageWrite("settings", out.str());
 }
 
 void audioShutdown() {
