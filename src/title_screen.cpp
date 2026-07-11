@@ -35,6 +35,17 @@ TitleScreen::TitleScreen() {
     layout = loadLayout("title");
     menuFromLayout(menu, ids, layout);
     mtime = layoutFileTime("title");
+
+#if defined(PLATFORM_WEB)
+    // No Quit button on web — the browser tab owns the app lifecycle.
+    for (int i = 0; i < (int)ids.size(); i++) {
+        if (ids[i] == "quit") {
+            menu.buttons.erase(menu.buttons.begin() + i);
+            ids.erase(ids.begin() + i);
+            break;
+        }
+    }
+#endif
 }
 
 ScreenType TitleScreen::update() {

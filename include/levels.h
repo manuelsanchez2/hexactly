@@ -10,7 +10,7 @@ struct LevelDef {
     const char* name;
     int         moveLimit;
     int         cellCount;
-    struct { int q, r, value, flags, goalValue; } cells[LVL_MAX_CELLS];
+    struct { int q, r, value, flags, goalValue, op; } cells[LVL_MAX_CELLS];
     int         wallCount;
     struct { int q1, r1, q2, r2; } walls[LVL_MAX_WALLS];
     int         portalCount;
@@ -22,3 +22,13 @@ extern const int      LEVEL_COUNT;
 
 // Levels 1..BEGINNER_COUNT are the Beginner tier; the rest are Advanced.
 const int BEGINNER_COUNT = 20;
+
+// ---- Daily challenge -------------------------------------------------------
+// One of 31 puzzles, rotating by calendar day (epoch-day % 31) so every player
+// worldwide gets the same one, with no server. Puzzles are generated as
+// guaranteed-solvable ascending chains, so any day is always winnable.
+const int DAILY_COUNT = 31;
+
+long     dailyEpochDay();          // whole days since the Unix epoch (UTC)
+int      dailyIndex();             // today's challenge, 0..DAILY_COUNT-1
+LevelDef makeDaily(int idx);       // deterministic puzzle for a given index
