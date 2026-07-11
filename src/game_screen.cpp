@@ -67,6 +67,8 @@ static const float TILE_WOB_DUR  = 0.25f;
 static const float TILE_WOB_DIST = 3.0f;
 static const float TILE_WOB_ROT  = 4.0f;
 
+static const float MOVES_WOB_DUR = 0.35f;   // moves-left number shake per spent move
+
 static void drawFlag(Vector2 c, float rotDeg = 0.0f) {
     Texture2D t = flagGoalTexture();
     float S = t.width / 3.0f;
@@ -268,6 +270,8 @@ void GameScreen::reloadCurrent()        { if (daily) loadDaily(); else loadLevel
 void GameScreen::applyLevel(const LevelDef& L) {
     board.cellCount = L.cellCount;
     board.movesLeft = L.moveLimit;
+    moveLimit       = L.moveLimit;
+    movesWob        = 0.0f;
     for (int i = 0; i < L.cellCount; i++) {
         board.cells[i].pos       = { L.cells[i].q, L.cells[i].r };
         board.cells[i].value     = L.cells[i].value;
@@ -358,6 +362,7 @@ void GameScreen::doMerge(int fromIdx, int toIdx) {
     board.cells[toIdx].value  *= 2;
     board.cells[fromIdx].value = 0;
     board.movesLeft--;
+    movesWob = MOVES_WOB_DUR;
 
     slideActive  = true;
     slideFrom    = hexToPixel(board.cells[fromIdx].pos, origin);
@@ -381,6 +386,7 @@ void GameScreen::doApply(int fromIdx, int toIdx) {
     board.cells[toIdx].op      = OP_NONE;   // operator consumed
     board.cells[fromIdx].value = 0;
     board.movesLeft--;
+    movesWob = MOVES_WOB_DUR;
 
     slideActive  = true;
     slideFrom    = hexToPixel(board.cells[fromIdx].pos, origin);
@@ -560,6 +566,7 @@ ScreenType GameScreen::update() {
     }
 
     for (int i = 0; i < board.cellCount; i++) if (cellWob[i] > 0) cellWob[i] -= dt;
+    if (movesWob > 0) movesWob -= dt;
     if (!paused && phase == PH_PLAYING) {
         Hex hh = pixelToHex(GetMousePosition(), origin);
         int hi = cellIndexAt(board, hh);
@@ -707,10 +714,28 @@ void GameScreen::draw() {
                  daily ? TextFormat("Daily #%d", dailyIndex() + 1)
                        : TextFormat("Level %d", currentLevel + 1),
                  { SCREEN_WIDTH / 2.0f, 54 }, 28);
+    bool lastMove = (phase == PH_PLAYING && board.movesLeft == 1 && moveLimit > 1);
+
     if (phase != PH_CELEBRATE && phase != PH_DONE) {
         drawDynLabel(layout, "moves", "moves left:", { SCREEN_WIDTH / 2.0f, 78 }, 20);
-        drawDynLabel(layout, "movesval", TextFormat("%d", board.movesLeft),
-                     { SCREEN_WIDTH / 2.0f, 102 }, 60);
+
+        const LayoutElement* e = layoutFind(layout, "movesval");
+        float mx = e ? e->x    : SCREEN_WIDTH / 2.0f;
+        float my = e ? e->y    : 102.0f;
+        float ms = e ? e->size : 60.0f;
+
+        float wv   = (movesWob > 0) ? wobbleAt(1.0f - movesWob / MOVES_WOB_DUR) : 0.0f;
+        float rot  = 6.0f * wv;
+        float dx   = 4.0f * wv;
+        float size = ms;
+        Color col  = INK;
+        if (lastMove) {
+            float pulse = 0.5f + 0.5f * sinf((float)GetTime() * 5.0f);
+            size *= 1.0f + 0.10f * pulse;
+            col   = HEXRED;
+        }
+        titleDrawCenteredAtRot(TextFormat("%d", board.movesLeft),
+                               mx + dx, my + ms * 0.5f, size, rot, col);
     }
 
     for (int i = 0; i < board.cellCount; i++) {

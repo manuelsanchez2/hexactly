@@ -97,6 +97,9 @@ private:
     float cellWob[MAX_CELLS] = { 0 };
     int   hoverPrev = -1;
 
+    int   moveLimit = 0;     // the loaded level's full move budget
+    float movesWob  = 0.0f;  // wobble timer for the moves-left number
+
     void openRules();
     void showTip(bool portal);
     void showFinal();
