@@ -42,9 +42,9 @@ int tilesRemaining(const BoardState& b) {
 
 bool anyLegalMove(const BoardState& b) {
     for (int i = 0; i < b.cellCount; i++) {
-        if (!b.cells[i].exists || b.cells[i].value == 0 || b.cells[i].isCursed) continue;
+        if (!b.cells[i].exists || b.cells[i].value == 0) continue;
         for (int j = 0; j < b.cellCount; j++) {
-            if (i == j || !b.cells[j].exists || b.cells[j].value == 0 || b.cells[j].isCursed) continue;
+            if (i == j || !b.cells[j].exists || b.cells[j].value == 0) continue;
             if (b.cells[i].value == b.cells[j].value &&
                 boardAdjacent(b, b.cells[i].pos, b.cells[j].pos)) {
                 return true;

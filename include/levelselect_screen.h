@@ -24,6 +24,8 @@ private:
     Editor                   editor;
     long                     mtime = 0;
 
+    int      tab = 0;
+
     float    wob[100] = { 0 };
     int      hoverPrev = -1;
 };

@@ -9,11 +9,17 @@
 #include "raylib.h"
 #include <cmath>
 
+#if defined(HEX_DEV)
+#include <string>
+#include <unordered_set>
+#include <vector>
+#endif
+
 static const float D2R = 3.14159265f / 180.0f;
 static const float SLIDE_DUR = 0.15f;
 static const float POP_DUR   = 0.22f;
 static const float PAUSE_SLIDE = 380.0f;
-static const float BOARD_DROP  = 110.0f;
+static const float BOARD_DROP  = 80.0f;
 
 static const float CELEBRATE_DUR = 1.10f;
 static const float SWAP_DUR      = 0.42f;
@@ -26,6 +32,7 @@ static float clamp01(float t) { return t < 0 ? 0 : (t > 1 ? 1 : t); }
 
 static Rectangle pausePanel() { return { SCREEN_WIDTH/2.0f - 170, SCREEN_HEIGHT/2.0f - 140, 340, 300 }; }
 static Rectangle rulesPanel() { return { SCREEN_WIDTH/2.0f - 260, SCREEN_HEIGHT/2.0f - 210, 520, 420 }; }
+static Rectangle congratsPanel() { return { SCREEN_WIDTH/2.0f - 260, SCREEN_HEIGHT/2.0f - 150, 520, 300 }; }
 
 static Rectangle rectOf(const Layout& L, const char* id, Rectangle def) {
     const LayoutElement* e = layoutFind(L, id);
@@ -37,10 +44,6 @@ static void hexCorners(Vector2 c, float size, float rotDeg, Vector2 out[6]) {
         float a = (60.0f * i - 90.0f + rotDeg) * D2R;
         out[i] = (Vector2){ c.x + size * cosf(a), c.y + size * sinf(a) };
     }
-}
-static void hexFill(Vector2 c, float size, float rotDeg, Color color) {
-    Vector2 p[6]; hexCorners(c, size, rotDeg, p);
-    DrawTriangleFan(p, 6, color);
 }
 static void hexOutline(Vector2 c, float size, float rotDeg, float thick, Color color) {
     Vector2 p[6]; hexCorners(c, size, rotDeg, p);
@@ -85,9 +88,6 @@ static void drawWall(Hex a, Hex b, Vector2 origin) {
                { mid.x + perp.x*half, mid.y + perp.y*half }, 6.0f, INK);
 }
 
-static const Color CURSE_TILE = { 170, 150, 200, 255 };
-static const Color CURSE_INK  = {  95,  75, 130, 255 };
-
 static void drawPortalMarkers(const BoardState& b, Hex pos, Vector2 at) {
     const float S = 16.0f;
     const float D = HEX_SIZE * 0.50f;
@@ -100,14 +100,6 @@ static void drawPortalMarkers(const BoardState& b, Hex pos, Vector2 at) {
         DrawTexturePro(t, { 0, 0, (float)t.width, (float)t.height },
                        { p.x, p.y, S, S }, { S / 2, S / 2 }, 0.0f, WHITE);
     }
-}
-
-static void drawCurseLock(Vector2 c) {
-    float bw = HEX_SIZE * 0.30f, bh = HEX_SIZE * 0.24f;
-    Rectangle body = { c.x - bw / 2, c.y - bh * 0.1f, bw, bh };
-    DrawRectangleRounded(body, 0.35f, 6, CURSE_INK);
-    DrawRing(c, bw * 0.24f, bw * 0.36f, 180, 360, 20, CURSE_INK);
-    DrawCircleV({ c.x, body.y + bh * 0.5f }, 2.5f, (Color){ 255, 253, 248, 255 });
 }
 
 static void drawTargetBadge(int target, Vector2 c) {
@@ -146,6 +138,9 @@ GameScreen::GameScreen() {
     Rectangle rp = rulesPanel();
     menuAdd(rulesMenu, { SCREEN_WIDTH/2.0f - 100, rp.y + rp.height - 66, 200, 52 }, "Got it!");
 
+    Rectangle cp = congratsPanel();
+    menuAdd(congratsMenu, { SCREEN_WIDTH/2.0f - 100, cp.y + cp.height - 76, 200, 52 }, "Let's go!");
+
     currentLevel = gStartLevel;
     loadLevel(currentLevel);
 
@@ -173,9 +168,7 @@ void GameScreen::loadLevel(int idx) {
         board.cells[i].pos       = { L.cells[i].q, L.cells[i].r };
         board.cells[i].value     = L.cells[i].value;
         board.cells[i].exists    = true;
-        board.cells[i].isGoal    = (L.cells[i].flags & F_GOAL)   != 0;
-        board.cells[i].isStone   = (L.cells[i].flags & F_STONE)  != 0;
-        board.cells[i].isCursed  = (L.cells[i].flags & F_CURSED) != 0;
+        board.cells[i].isGoal    = (L.cells[i].flags & F_GOAL) != 0;
         board.cells[i].goalValue = L.cells[i].goalValue;
     }
     board.wallCount = L.wallCount;
@@ -255,14 +248,6 @@ void GameScreen::doMerge(int fromIdx, int toIdx) {
     slideLandIdx = toIdx;
     slideT       = 0.0f;
 
-    for (int i = 0; i < board.cellCount; i++) {
-        if (board.cells[i].isCursed &&
-            boardAdjacent(board, board.cells[toIdx].pos, board.cells[i].pos)) {
-            board.cells[i].isCursed = false;
-            cellWob[i] = TILE_WOB_DUR;
-        }
-    }
-
     playMerge();
     selectedIdx = -1;
     checkEnd();
@@ -276,6 +261,8 @@ void GameScreen::checkEnd() {
         playWin();
 
         Progress p = loadProgress();
+        if (currentLevel == BEGINNER_COUNT - 1 && !levelDone(p, currentLevel))
+            pendingCongrats = true;
         markLevelDone(p, currentLevel);
         saveProgress(p);
 
@@ -359,11 +346,31 @@ ScreenType GameScreen::update() {
     }
 
     if (phase == PH_CELEBRATE) {
+        if (congratsActive) {
+            congratsAnim += (1.0f - congratsAnim) * (1.0f - expf(-10.0f * dt));
+            congratsMenu.offset.y = (1.0f - easeOutBack(clamp01(congratsAnim))) * PAUSE_SLIDE;
+            int a = menuUpdate(congratsMenu, dt);
+            if (a == 0 || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ENTER)) {
+                congratsActive = false;
+                beginSwap();
+            }
+            return ScreenType::NONE;
+        }
         winTimer += dt;
         bool tap = winTimer > 0.2f &&
                    (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) ||
                     IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ENTER));
-        if (winTimer >= CELEBRATE_DUR || tap) beginSwap();
+        if (winTimer >= CELEBRATE_DUR || tap) {
+            if (pendingCongrats) {
+                pendingCongrats = false;
+                congratsActive  = true;
+                congratsAnim    = 0.0f;
+                congratsMenu.focus = 0;
+                for (Button& b : congratsMenu.buttons) b.anim = 0.0f;
+            } else {
+                beginSwap();
+            }
+        }
         return ScreenType::NONE;
     }
 
@@ -402,8 +409,7 @@ ScreenType GameScreen::update() {
     if (!paused && phase == PH_PLAYING) {
         Hex hh = pixelToHex(GetMousePosition(), origin);
         int hi = cellIndexAt(board, hh);
-        if (hi >= 0 && (board.cells[hi].value == 0 || board.cells[hi].isStone ||
-                        board.cells[hi].isCursed)) hi = -1;
+        if (hi >= 0 && board.cells[hi].value == 0) hi = -1;
         if (hi != hoverPrev) { if (hi >= 0) cellWob[hi] = TILE_WOB_DUR; hoverPrev = hi; }
     } else {
         hoverPrev = -1;
@@ -450,6 +456,9 @@ ScreenType GameScreen::update() {
     }
     if (IsKeyPressed(KEY_U) || IsKeyPressed(KEY_Z)) doUndo();
     if (IsKeyPressed(KEY_R)) loadLevel(currentLevel);
+#if defined(HEX_DEV)
+    if (IsKeyPressed(KEY_D) && phase == PH_PLAYING) debugSolve();
+#endif
 
     bool overHud = false;
     Vector2 mouse = GetMousePosition();
@@ -463,8 +472,7 @@ ScreenType GameScreen::update() {
             dragging   = false;
             Hex hx = pixelToHex(mouse, origin);
             int idx = cellIndexAt(board, hx);
-            pressIdx = (idx >= 0 && board.cells[idx].value > 0 &&
-                        !board.cells[idx].isCursed) ? idx : -1;
+            pressIdx = (idx >= 0 && board.cells[idx].value > 0) ? idx : -1;
         }
 
         if (pressIdx >= 0 && IsMouseButtonDown(MOUSE_LEFT_BUTTON) && !dragging) {
@@ -478,13 +486,11 @@ ScreenType GameScreen::update() {
         if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
             Hex hx = pixelToHex(mouse, origin);
             int target = cellIndexAt(board, hx);
-            bool targetTile = (target >= 0 && board.cells[target].value > 0 &&
-                               !board.cells[target].isCursed);
+            bool targetTile = (target >= 0 && board.cells[target].value > 0);
 
             auto legal = [&](int a, int b) {
                 return a >= 0 && b >= 0 && a != b &&
                        board.cells[a].value > 0 && board.cells[b].value > 0 &&
-                       !board.cells[a].isCursed && !board.cells[b].isCursed &&
                        board.cells[a].value == board.cells[b].value &&
                        boardAdjacent(board, board.cells[a].pos, board.cells[b].pos);
             };
@@ -542,12 +548,6 @@ void GameScreen::draw() {
         c.y += sinf((float)GetTime() * 2.0f + (cell.pos.q + cell.pos.r)) * 1.5f;
         float rot = wobbleDeg(cell.pos);
 
-        if (cell.isStone) {
-            hexFill(c, HEX_SIZE - 3, rot, (Color){ 150, 148, 140, 255 });
-            hexOutline(c, HEX_SIZE - 3, rot, 3.0f, (Color){ 90, 88, 82, 255 });
-            continue;
-        }
-
         if (cell.value == 0) {
             if (cell.isGoal) {
                 drawFlag(c);
@@ -565,14 +565,13 @@ void GameScreen::draw() {
 
         bool anySel    = (selectedIdx >= 0);
         bool isSel     = (i == selectedIdx);
-        bool isPartner = anySel && !isSel && !cell.isCursed &&
+        bool isPartner = anySel && !isSel &&
                          board.cells[selectedIdx].value == cell.value &&
                          boardAdjacent(board, board.cells[selectedIdx].pos, cell.pos);
         bool dim       = anySel && !isSel && !isPartner;
 
         Color tileTint = dim ? (Color){ 140, 140, 140, 255 } : WHITE;
         Color numCol   = dim ? (Color){ 120, 120, 120, 255 } : INK;
-        if (cell.isCursed) { tileTint = CURSE_TILE; numCol = CURSE_INK; }
 
         float tileScale = pop * (isSel ? 1.10f : 1.0f);
         Vector2 dc = c;
@@ -595,8 +594,6 @@ void GameScreen::draw() {
 
         titleDrawCenteredAtRot(TextFormat("%d", displayValue), wc.x, wc.y,
                                HEX_SIZE * 0.85f, wrot, numCol);
-
-        if (cell.isCursed) drawCurseLock(wc);
 
         drawPortalMarkers(board, cell.pos, wc);
     }
@@ -645,6 +642,33 @@ void GameScreen::draw() {
         }
         drawConfetti();
         drawPraise(1.0f, 0.0f);
+
+        if (congratsActive) {
+            float a  = clamp01(congratsAnim);
+            float dy = congratsMenu.offset.y;
+
+            DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Fade(BLACK, 0.6f * a));
+
+            Rectangle panel = congratsPanel();
+            panel.y += dy;
+            DrawRectangleRec(panel, Fade(PAPER, a));
+            DrawRectangleLinesEx(panel, 2, Fade(INK, a));
+
+            titleDrawCentered("Congratulations!", panel.y + 26, 40, Fade(HEXRED, a));
+
+            static const char* LINES[] = {
+                "You have unlocked the advanced mode,",
+                "the real game starts there!",
+            };
+            float y = panel.y + 96;
+            for (const char* line : LINES) {
+                float w = titleMeasure(line, 22).x;
+                titleDraw(line, SCREEN_WIDTH / 2.0f - w / 2, y, 22, Fade(INK, a));
+                y += 38;
+            }
+
+            menuDraw(congratsMenu);
+        }
         return;
     }
 
@@ -721,23 +745,15 @@ void GameScreen::drawStaticBoard(const BoardState& b, Vector2 org) {
         c.y += sinf((float)GetTime() * 2.0f + (cell.pos.q + cell.pos.r)) * 1.5f;
         float rot = wobbleDeg(cell.pos);
 
-        if (cell.isStone) {
-            hexFill(c, HEX_SIZE - 3, rot, (Color){ 150, 148, 140, 255 });
-            hexOutline(c, HEX_SIZE - 3, rot, 3.0f, (Color){ 90, 88, 82, 255 });
-            continue;
-        }
         if (cell.value == 0) {
             if (cell.isGoal) drawFlag(c);
             else hexOutline(c, HEX_SIZE - 3, rot, 2.0f, (Color){ 210, 208, 200, 255 });
             continue;
         }
-        Color tint = cell.isCursed ? CURSE_TILE : WHITE;
-        Color ink  = cell.isCursed ? CURSE_INK  : INK;
-        drawHexTile(c, 1.0f, tint);
+        drawHexTile(c, 1.0f, WHITE);
         if (cell.isGoal) drawFlag(c);
         titleDrawCenteredAtRot(TextFormat("%d", cell.value), c.x, c.y,
-                               HEX_SIZE * 0.85f, 0.0f, ink);
-        if (cell.isCursed) drawCurseLock(c);
+                               HEX_SIZE * 0.85f, 0.0f, INK);
         drawPortalMarkers(b, cell.pos, c);
     }
     for (int i = 0; i < b.wallCount; i++)
@@ -779,6 +795,54 @@ void GameScreen::drawConfetti() {
                    3.0f, Fade(p.col, a));
     }
 }
+
+#if defined(HEX_DEV)
+// Dev helper (D key): exhaustive search for a winning merge sequence from the
+// current position, then play it out. Same rules as update(); memoises dead
+// states so the trap-heavy Advanced boards stay fast.
+static std::string stateKey(const BoardState& b) {
+    std::string k;
+    k.reserve(b.cellCount + 1);
+    for (int i = 0; i < b.cellCount; i++) {
+        int v = b.cells[i].value, e = 0;
+        while (v > 1) { v >>= 1; e++; }
+        k.push_back((char)('0' + e));
+    }
+    k.push_back((char)('a' + b.movesLeft));
+    return k;
+}
+
+static bool searchWin(const BoardState& b, std::vector<std::pair<int,int>>& out,
+                      std::unordered_set<std::string>& dead) {
+    if (isWon(b)) return true;
+    if (b.movesLeft <= 0) return false;
+    std::string key = stateKey(b);
+    if (dead.count(key)) return false;
+    for (int i = 0; i < b.cellCount; i++) {
+        if (b.cells[i].value == 0) continue;
+        for (int j = 0; j < b.cellCount; j++) {
+            if (i == j || b.cells[j].value != b.cells[i].value) continue;
+            if (!boardAdjacent(b, b.cells[i].pos, b.cells[j].pos)) continue;
+            BoardState nb = b;
+            nb.cells[j].value *= 2;
+            nb.cells[i].value  = 0;
+            nb.movesLeft--;
+            out.push_back({ i, j });
+            if (searchWin(nb, out, dead)) return true;
+            out.pop_back();
+        }
+    }
+    dead.insert(key);
+    return false;
+}
+
+void GameScreen::debugSolve() {
+    std::vector<std::pair<int,int>> seq;
+    std::unordered_set<std::string> dead;
+    if (!searchWin(board, seq, dead)) return;   // no win from here: undo first
+    for (const auto& m : seq) doMerge(m.first, m.second);
+}
+#endif
 
 void GameScreen::drawPraise(float alpha, float yUp) {
     float scale = easeOutBack(clamp01(winTimer / PRAISE_IN));

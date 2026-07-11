@@ -80,6 +80,11 @@ private:
     float rulesAnim    = 0.0f;
     Menu  rulesMenu;
 
+    bool  pendingCongrats = false;   // beat the last Beginner level this run
+    bool  congratsActive  = false;
+    float congratsAnim    = 0.0f;
+    Menu  congratsMenu;
+
     int     pressIdx   = -1;
     bool    dragging   = false;
     Vector2 pressStart = { 0, 0 };
@@ -95,6 +100,9 @@ private:
     void doUndo();
     void doMerge(int fromIdx, int toIdx);
     void checkEnd();
+#if defined(HEX_DEV)
+    void debugSolve();
+#endif
 
     void beginSwap();
     void spawnConfetti(Vector2 at);

@@ -5,8 +5,6 @@ const int LVL_MAX_WALLS   = 16;
 const int LVL_MAX_PORTALS = 8;
 
 const int F_GOAL   = 1; // the winning tile must end here, with a flag icon
-const int F_STONE  = 2; // an inert rock
-const int F_CURSED = 4; // locked until a merge happens next to it, will come later
 
 struct LevelDef {
     const char* name;
@@ -21,3 +19,6 @@ struct LevelDef {
 
 extern const LevelDef LEVELS[];
 extern const int      LEVEL_COUNT;
+
+// Levels 1..BEGINNER_COUNT are the Beginner tier; the rest are Advanced.
+const int BEGINNER_COUNT = 20;

@@ -11,8 +11,6 @@ struct Cell {
     int  value;
     bool exists;
     bool isGoal;
-    bool isStone;
-    bool isCursed;
     int  goalValue;
 };
 
