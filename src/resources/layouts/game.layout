@@ -1,9 +1,9 @@
-# game.layout — saved by the in-game editor (F1).
-# See title.layout for the full format reference.
+# game.layout
 
 button id=info x=24 y=24 w=30 h=30 text=
 button id=pause x=666 y=24 w=30 h=30 text=
-button id=undo x=206.55 y=172.504 w=30 h=30 text=
+button id=undo x=332.523 y=182.731 w=30 h=30 text=
 button id=target x=428.949 y=156.315 w=88 h=88 text=
 label  id=level align=center x=360 y=58.332 size=28 font=title color=ink text=Level 8
-label  id=moves align=center x=221.762 y=133.601 size=20 font=title color=ink text=moves left: 9
+label  id=moves align=center x=221.762 y=133.601 size=20 font=title color=ink text=moves left:
+label  id=movesval align=center x=220.438 y=173.648 size=60 font=title color=ink text=9

@@ -96,7 +96,7 @@ static void drawPortalMarkers(const BoardState& b, Hex pos, Vector2 at) {
         bool      isA = (k % 2 == 0);
         Texture2D t   = isA ? portalATexture() : portalBTexture();
         Vector2   p   = isA ? (Vector2){ at.x - D, at.y }
-                            : (Vector2){ at.x, at.y - D };
+                            : (Vector2){ at.x - 1, at.y - D - 3 };
         DrawTexturePro(t, { 0, 0, (float)t.width, (float)t.height },
                        { p.x, p.y, S, S }, { S / 2, S / 2 }, 0.0f, WHITE);
     }
@@ -707,9 +707,11 @@ void GameScreen::draw() {
                  daily ? TextFormat("Daily #%d", dailyIndex() + 1)
                        : TextFormat("Level %d", currentLevel + 1),
                  { SCREEN_WIDTH / 2.0f, 54 }, 28);
-    if (phase != PH_CELEBRATE && phase != PH_DONE)
-        drawDynLabel(layout, "moves", TextFormat("moves left: %d", board.movesLeft),
-                     { SCREEN_WIDTH / 2.0f, 90 }, 20);
+    if (phase != PH_CELEBRATE && phase != PH_DONE) {
+        drawDynLabel(layout, "moves", "moves left:", { SCREEN_WIDTH / 2.0f, 78 }, 20);
+        drawDynLabel(layout, "movesval", TextFormat("%d", board.movesLeft),
+                     { SCREEN_WIDTH / 2.0f, 102 }, 60);
+    }
 
     for (int i = 0; i < board.cellCount; i++) {
         const Cell& cell = board.cells[i];
