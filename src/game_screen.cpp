@@ -263,6 +263,8 @@ void GameScreen::checkEnd() {
         Progress p = loadProgress();
         if (currentLevel == BEGINNER_COUNT - 1 && !levelDone(p, currentLevel))
             pendingCongrats = true;
+        if (currentLevel == LEVEL_COUNT - 1)
+            pendingFinale = true;
         markLevelDone(p, currentLevel);
         saveProgress(p);
 
@@ -361,11 +363,14 @@ ScreenType GameScreen::update() {
                    (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) ||
                     IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ENTER));
         if (winTimer >= CELEBRATE_DUR || tap) {
-            if (pendingCongrats) {
+            if (pendingCongrats || pendingFinale) {
+                congratsKind    = pendingFinale ? 1 : 0;
                 pendingCongrats = false;
+                pendingFinale   = false;
                 congratsActive  = true;
                 congratsAnim    = 0.0f;
                 congratsMenu.focus = 0;
+                congratsMenu.buttons[0].text = (congratsKind == 1) ? "Done!" : "Let's go!";
                 for (Button& b : congratsMenu.buttons) b.anim = 0.0f;
             } else {
                 beginSwap();
@@ -656,14 +661,19 @@ void GameScreen::draw() {
 
             titleDrawCentered("Congratulations!", panel.y + 26, 40, Fade(HEXRED, a));
 
-            static const char* LINES[] = {
+            static const char* UNLOCK_LINES[] = {
                 "You have unlocked the advanced mode,",
                 "the real game starts there!",
             };
+            static const char* FINALE_LINES[] = {
+                "Thank you for playing,",
+                "hope you liked the game!",
+            };
+            const char** lines = (congratsKind == 1) ? FINALE_LINES : UNLOCK_LINES;
             float y = panel.y + 96;
-            for (const char* line : LINES) {
-                float w = titleMeasure(line, 22).x;
-                titleDraw(line, SCREEN_WIDTH / 2.0f - w / 2, y, 22, Fade(INK, a));
+            for (int i = 0; i < 2; i++) {
+                float w = titleMeasure(lines[i], 22).x;
+                titleDraw(lines[i], SCREEN_WIDTH / 2.0f - w / 2, y, 22, Fade(INK, a));
                 y += 38;
             }
 

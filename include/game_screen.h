@@ -81,6 +81,8 @@ private:
     Menu  rulesMenu;
 
     bool  pendingCongrats = false;   // beat the last Beginner level this run
+    bool  pendingFinale   = false;   // beat the last level of the game
+    int   congratsKind    = 0;       // 0 = advanced unlocked, 1 = finale
     bool  congratsActive  = false;
     float congratsAnim    = 0.0f;
     Menu  congratsMenu;
