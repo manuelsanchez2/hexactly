@@ -7,9 +7,11 @@
 #include "editor.h"
 #include "raylib.h"
 
+struct LevelDef;
+
 const int MAX_UNDO = 64;
 
-enum GamePhase { PH_PLAYING, PH_LOST, PH_CELEBRATE, PH_SWAP };
+enum GamePhase { PH_PLAYING, PH_LOST, PH_CELEBRATE, PH_SWAP, PH_DONE };
 
 struct Confetti {
     Vector2 pos, vel;
@@ -80,6 +82,9 @@ private:
     float rulesAnim    = 0.0f;
     Menu  rulesMenu;
 
+    std::string              ovTitle;   // current overlay heading
+    std::vector<std::string> ovLines;   // current overlay body lines
+
     int     pressIdx   = -1;
     bool    dragging   = false;
     Vector2 pressStart = { 0, 0 };
@@ -88,12 +93,23 @@ private:
     int   hoverPrev = -1;
 
     void openRules();
+    void showTip(bool portal);
+    void showFinal();
+    void presentOverlay();
     void closeRules();
 
+    bool endGame = false;   // final "thanks for playing" modal is up
+
+    bool daily = false;   // this run is a daily challenge, not a numbered level
+
+    void applyLevel(const LevelDef& L);
     void loadLevel(int idx);
+    void loadDaily();
+    void reloadCurrent();
     void pushUndo();
     void doUndo();
     void doMerge(int fromIdx, int toIdx);
+    void doApply(int fromIdx, int toIdx);
     void checkEnd();
 
     void beginSwap();

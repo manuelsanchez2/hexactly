@@ -4,7 +4,8 @@
 #include "levelselect_screen.h"
 #include "game_screen.h"
 
-int gStartLevel = 0;
+int  gStartLevel = 0;
+bool gDailyMode  = false;
 
 std::unique_ptr<Screen> createScreen(ScreenType type) {
     switch (type) {

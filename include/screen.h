@@ -22,4 +22,5 @@ public:
 
 std::unique_ptr<Screen> createScreen(ScreenType type);
 
-extern int gStartLevel;
+extern int  gStartLevel;
+extern bool gDailyMode;

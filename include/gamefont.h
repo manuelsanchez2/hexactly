@@ -22,6 +22,8 @@ Texture2D logoSheetTexture();
 Texture2D btnInfoTexture();
 Texture2D btnPauseTexture();
 Texture2D btnUndoTexture();
+Texture2D btnDailyTexture();
+Texture2D btnDailyTickTexture();
 
 Vector2 titleMeasure(const char *text, float size);
 void    titleDraw(const char *text, float x, float y, float size, Color color);
