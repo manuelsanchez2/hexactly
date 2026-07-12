@@ -64,6 +64,37 @@ int goalIndex(const BoardState& b) {
     return -1;
 }
 
+bool bombGuards(const BoardState& b, Hex h) {
+    for (int i = 0; i < b.bombCount; i++) {
+        if (b.bombs[i].armed && boardAdjacent(b, b.bombs[i].pos, h)) return true;
+    }
+    return false;
+}
+
+BombResult previewBombs(const BoardState& b, Hex from, Hex to, int result) {
+    BombResult r = { -1, -1 };
+    for (int i = 0; i < b.bombCount; i++) {
+        const Bomb& bomb = b.bombs[i];
+        if (!bomb.armed) continue;
+        if (boardAdjacent(b, bomb.pos, to) && result == bomb.value) {
+            r.defusedIdx = i;
+        } else if (boardAdjacent(b, bomb.pos, from) || boardAdjacent(b, bomb.pos, to)) {
+            r.explodedIdx = i;
+        }
+    }
+    return r;
+}
+
+BombResult applyBombs(BoardState& b, Hex from, Hex to, int result) {
+    BombResult r = previewBombs(b, from, to, result);
+    for (int i = 0; i < b.bombCount; i++) {
+        Bomb& bomb = b.bombs[i];
+        if (bomb.armed && result == bomb.value && boardAdjacent(b, bomb.pos, to))
+            bomb.armed = false;
+    }
+    return r;
+}
+
 bool isWon(const BoardState& b) {
     int g = goalIndex(b);
 

@@ -19,7 +19,14 @@ report(name, level). Fields:
     goalValue: explicit target (0 = sum of all tiles -> merge everything)
     walls:     [((q,r), (q,r)), ...]   blocked edges
     portals:   [((q,r), (q,r)), ...]   extra adjacency
+    bombs:     [((q,r), value), ...]   armed bombs (optional; cell is NOT in cells)
     moves:     move limit
+
+Bomb rules (levels 21-25): a merge whose source or target cell touches an
+armed bomb (hex adjacency minus walls, plus portals anchored on the bomb cell)
+sets it off and loses -- unless the merge lands exactly the bomb's value on a
+cell touching it, which defuses that bomb instead. Exploding first moves are
+counted among the traps.
 
 report() prints:
     min_moves          shortest win (should equal moves)
@@ -53,30 +60,63 @@ def goal_value(level):
     gv = level.get('goalValue', 0)
     return gv if gv else sum(level['cells'].values())
 
+def bomb_zone(level, bpos):
+    """Cells that 'touch' a bomb: hex neighbours minus walls, plus portals
+    anchored on the bomb cell -- the same adjacency the game uses."""
+    walls = {frozenset(w) for w in level['walls']}
+    z = set()
+    for d in DIRS:
+        c = (bpos[0]+d[0], bpos[1]+d[1])
+        if c in level['cells'] and frozenset((bpos, c)) not in walls:
+            z.add(c)
+    for p in level['portals']:
+        a, b = tuple(p[0]), tuple(p[1])
+        if a == bpos and b in level['cells']: z.add(b)
+        if b == bpos and a in level['cells']: z.add(a)
+    return z
+
 def solve(level):
     """Memoized exhaustive search over all merge sequences."""
     adj = build_adj(level)
+    bombs = [(tuple(bp), bv) for bp, bv in level.get('bombs', [])]
+    zones = [bomb_zone(level, bp) for bp, _ in bombs]
+    nb = len(bombs)
     order = sorted(level['cells'].keys())
     idx = {c: i for i, c in enumerate(order)}
     goal = tuple(level['goal'])
     gv = goal_value(level)
     limit = level['moves']
-    start = tuple(level['cells'][c] for c in order)
+    start = (tuple(level['cells'][c] for c in order), tuple([True] * nb))
 
-    def legal_moves(state):
+    def all_moves(state):
+        """(a, b, boom, defuse) for every merge of equal neighbours. boom moves
+        set off a bomb and lose instantly; defuse flags the bombs disarmed."""
+        vals, armed = state
         ms = []
         for a in order:
-            va = state[idx[a]]
+            va = vals[idx[a]]
             if va == 0: continue
             for b in adj[a]:
-                if state[idx[b]] == va:
-                    ms.append((a, b))   # a slides onto b, b doubles
+                if vals[idx[b]] != va: continue
+                res = va * 2
+                defuse = tuple(armed[i] and b in zones[i] and res == bombs[i][1]
+                               for i in range(nb))
+                boom = any(armed[i] and not defuse[i] and
+                           (a in zones[i] or b in zones[i]) for i in range(nb))
+                ms.append((a, b, boom, defuse))   # a slides onto b, b doubles
         return ms
+
+    def apply_move(state, a, b, defuse):
+        vals, armed = state
+        s2 = list(vals)
+        s2[idx[a]] = 0
+        s2[idx[b]] = vals[idx[b]] * 2
+        return (tuple(s2), tuple(armed[i] and not defuse[i] for i in range(nb)))
 
     memo = {}
 
     def rec(state, movesLeft):
-        if state[idx[goal]] == gv:
+        if state[0][idx[goal]] == gv:
             return frozenset([frozenset()]), 1, 0
         if movesLeft <= 0:
             return frozenset(), 0, None
@@ -84,12 +124,10 @@ def solve(level):
         if key in memo:
             return memo[key]
         sets, nseq, best = set(), 0, None
-        for (a, b) in legal_moves(state):
-            v = state[idx[b]]
-            s2 = list(state)
-            s2[idx[a]] = 0
-            s2[idx[b]] = v * 2
-            csets, cn, cbest = rec(tuple(s2), movesLeft - 1)
+        for (a, b, boom, defuse) in all_moves(state):
+            if boom: continue
+            v = state[0][idx[b]]
+            csets, cn, cbest = rec(apply_move(state, a, b, defuse), movesLeft - 1)
             nseq += cn
             if cbest is not None and (best is None or cbest + 1 < best):
                 best = cbest + 1
@@ -103,21 +141,19 @@ def solve(level):
 
     sets, nseq, best = rec(start, limit)
 
-    first = legal_moves(start)
+    first = all_moves(start)
     winning_firsts = set()
     sample = None
-    for (a, b) in first:
-        v = start[idx[b]]
-        s2 = list(start)
-        s2[idx[a]] = 0
-        s2[idx[b]] = v * 2
-        csets, cn, _ = rec(tuple(s2), limit - 1)
+    for (a, b, boom, defuse) in first:
+        if boom: continue                      # exploding first move: a trap
+        v = start[0][idx[b]]
+        csets, cn, _ = rec(apply_move(start, a, b, defuse), limit - 1)
         if cn > 0:
             winning_firsts.add((a, b))
             if sample is None and csets:
                 sub = min(csets, key=len)
                 sample = [(a, b, v * 2)] + sorted(sub, key=lambda m: m[2])
-    traps = [m for m in first if m not in winning_firsts]
+    traps = [(a, b) for (a, b, _, _) in first if (a, b) not in winning_firsts]
 
     return {
         'min_moves': best,
@@ -130,7 +166,8 @@ def solve(level):
 
 def board_fit(level, hex_size=42.0):
     xs, ys = [], []
-    for (q, r) in level['cells']:
+    spots = list(level['cells']) + [tuple(bp) for bp, _ in level.get('bombs', [])]
+    for (q, r) in spots:
         xs.append(hex_size * (sqrt(3)*q + sqrt(3)/2*r))
         ys.append(hex_size * 1.5 * r)
     w = max(xs)-min(xs); h = max(ys)-min(ys)
@@ -166,11 +203,17 @@ def emit_cpp(name, level):
         lines.append(body + (',' if i + 4 < len(parts) else ' },'))
     wstr = ', '.join(f"{{{a[0]},{a[1]}, {b[0]},{b[1]}}}" for a, b in level['walls'])
     pstr = ', '.join(f"{{{a[0]},{a[1]}, {b[0]},{b[1]}}}" for a, b in level['portals'])
+    bombs = level.get('bombs', [])
+    bstr = ', '.join(f"{{{p[0]},{p[1]}, {v}}}" for p, v in bombs)
     lines.append(f"      {len(level['walls'])}, {{{(' ' + wstr + ' ') if wstr else ''}}},")
-    lines.append(f"      {len(level['portals'])}, {{{(' ' + pstr + ' ') if pstr else ''}}} }},")
+    if bombs:
+        lines.append(f"      {len(level['portals'])}, {{{(' ' + pstr + ' ') if pstr else ''}}},")
+        lines.append(f"      {len(bombs)}, {{ {bstr} }} }},")
+    else:
+        lines.append(f"      {len(level['portals'])}, {{{(' ' + pstr + ' ') if pstr else ''}}} }},")
     return '\n'.join(lines)
 
-# --- The Advanced levels (21-30) as shipped in src/levels.cpp. -------------
+# --- The Advanced levels (26-35) as shipped in src/levels.cpp. -------------
 ADVANCED = [
     ('decoy', {
         'cells': {(0,0):2, (1,0):2, (0,-1):2, (1,-1):2,
@@ -239,12 +282,47 @@ ADVANCED = [
         'portals': [((0,0),(3,1)), ((0,0),(-3,1))], 'moves': 6}),
 ]
 
+# --- The bomb levels (21-25) as shipped in src/levels.cpp. -----------------
+BOMBS = [
+    ('short fuse', {
+        'cells': {(0,0):2, (1,0):2, (2,0):4, (3,0):8, (4,0):16},
+        'goal': (4,0), 'goalValue': 32,
+        'walls': [], 'portals': [],
+        'bombs': [((2,-1), 4)], 'moves': 4}),
+    ('eye of the storm', {
+        'cells': {(0,0):4, (1,0):4, (0,-1):8, (-1,0):4, (-1,1):4, (-2,2):8},
+        'goal': (0,0), 'goalValue': 32,
+        'walls': [], 'portals': [],
+        'bombs': [((1,-1), 8)], 'moves': 5}),
+    ('care package', {
+        'cells': {(0,0):2, (1,0):2, (2,0):2, (3,0):2, (5,-1):8, (6,-2):16},
+        'goal': (6,-2), 'goalValue': 32,
+        'walls': [], 'portals': [((2,0),(5,-1))],
+        'bombs': [((6,-1), 16)], 'moves': 5}),
+    ('bunker', {
+        'cells': {(0,0):2, (1,0):2, (2,0):4, (3,0):2, (4,0):2, (4,-1):4},
+        'goal': (2,0), 'goalValue': 16,
+        'walls': [((2,-1),(1,0))], 'portals': [],
+        'bombs': [((2,-1), 8)], 'moves': 5}),
+    ('crossfire', {
+        'cells': {(-2,1):4, (-1,1):4, (0,0):8, (1,0):8, (2,0):4, (3,-1):4},
+        'goal': (0,0), 'goalValue': 32,
+        'walls': [], 'portals': [],
+        'bombs': [((-1,0), 8), ((1,-1), 16)], 'moves': 5}),
+]
+
 if __name__ == '__main__':
     ok = True
     for name, lvl in ADVANCED:
         r = report(name, lvl)
         if not (r['min_moves'] == lvl['moves'] and r['n_solution_sets'] == 1
                 and r['n_trap_first_moves'] >= 2):
+            ok = False
+            print(f"  !! {name} FAILED verification")
+    for name, lvl in BOMBS:
+        r = report(name, lvl)
+        if not (r['min_moves'] == lvl['moves'] and r['n_solution_sets'] == 1
+                and r['n_trap_first_moves'] >= 1):
             ok = False
             print(f"  !! {name} FAILED verification")
     print("ALL VERIFIED" if ok else "FAILURES PRESENT")

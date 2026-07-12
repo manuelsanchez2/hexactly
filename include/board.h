@@ -5,6 +5,7 @@
 const int MAX_CELLS   = 32;
 const int MAX_WALLS   = 16;
 const int MAX_PORTALS = 8;
+const int MAX_BOMBS   = 4;
 
 // Operator tiles (daily challenges only). A value tile dragged onto an adjacent
 // operator tile is transformed by it; the operator is consumed. Normal levels
@@ -41,6 +42,16 @@ struct Wall { Hex a, b; };
 
 struct Portal { Hex a, b; };
 
+// Bomb levels (21-25). A bomb occupies its own cell-less hex. While armed, any
+// merge whose source or target touches it explodes it (level lost) - unless
+// the merge lands exactly `value` on a touching cell, which defuses it.
+// "Touching" is boardAdjacent: walls shield a neighbour, portals reach one.
+struct Bomb {
+    Hex  pos;
+    int  value;
+    bool armed;
+};
+
 struct BoardState {
     Cell   cells[MAX_CELLS];
     int    cellCount;
@@ -49,7 +60,14 @@ struct BoardState {
     int    wallCount;
     Portal portals[MAX_PORTALS];
     int    portalCount;
+    Bomb   bombs[MAX_BOMBS];
+    int    bombCount;
 };
+
+// Outcome of a merge (from -> to, producing result) on the board's bombs.
+// Matching bombs are disarmed in place; explodedIdx / defusedIdx report the
+// bomb hit (or -1). An explosion means the level is lost.
+struct BombResult { int explodedIdx; int defusedIdx; };
 
 int  cellIndexAt(const BoardState& b, Hex h);
 bool boardAdjacent(const BoardState& b, Hex a, Hex c);
@@ -58,3 +76,6 @@ int  tilesRemaining(const BoardState& b);
 bool anyLegalMove(const BoardState& b);
 int  goalIndex(const BoardState& b);
 bool isWon(const BoardState& b);
+bool bombGuards(const BoardState& b, Hex h);   // some armed bomb touches h
+BombResult applyBombs(BoardState& b, Hex from, Hex to, int result);
+BombResult previewBombs(const BoardState& b, Hex from, Hex to, int result);
