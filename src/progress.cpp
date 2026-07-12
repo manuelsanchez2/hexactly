@@ -24,6 +24,8 @@ Progress loadProgress() {
             p.seenWalls = (std::stoi(val) != 0);
         } else if (key == "seenP") {
             p.seenPortals = (std::stoi(val) != 0);
+        } else if (key == "seenB") {
+            p.seenBombs = (std::stoi(val) != 0);
         } else if (key == "seenO") {
             p.seenDailyOps = (std::stoi(val) != 0);
         } else if (key == "dLast") {
@@ -43,6 +45,7 @@ void saveProgress(const Progress& p) {
     out << "seen=" << (p.seenRules ? 1 : 0) << "\n";
     out << "seenW=" << (p.seenWalls ? 1 : 0) << "\n";
     out << "seenP=" << (p.seenPortals ? 1 : 0) << "\n";
+    out << "seenB=" << (p.seenBombs ? 1 : 0) << "\n";
     out << "seenO=" << (p.seenDailyOps ? 1 : 0) << "\n";
     out << "dLast=" << p.dailyLastDay << "\n";
     out << "dStreak=" << p.dailyStreak << "\n";

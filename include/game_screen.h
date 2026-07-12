@@ -48,6 +48,12 @@ private:
     float   starTimer  = 0.0f;
     Vector2 starCenter = { 0, 0 };
 
+    bool    exploded     = false;      // a bomb went off; PH_LOST with a bang
+    float   boomTimer    = 0.0f;
+    Vector2 boomCenter   = { 0, 0 };
+    float   defuseTimer  = 0.0f;
+    Vector2 defuseCenter = { 0, 0 };
+
     float    winTimer   = 0.0f;
     float    haloTimer  = 0.0f;
     Vector2  winCenter  = { 0, 0 };
@@ -101,7 +107,7 @@ private:
     float movesWob  = 0.0f;  // wobble timer for the moves-left number
 
     void openRules();
-    void showTip(bool portal);
+    void showTip(int kind);   // 0 walls, 1 portals, 2 bombs
     void showFinal();
     void presentOverlay();
     void closeRules();

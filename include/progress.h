@@ -5,6 +5,7 @@ struct Progress {
     bool seenRules   = false;
     bool seenWalls   = false;
     bool seenPortals = false;
+    bool seenBombs   = false;
     bool seenDailyOps = false;   // shown the operator tip on the first daily
 
     long dailyLastDay = -1;   // epoch-day of the last daily win (-1 = never)

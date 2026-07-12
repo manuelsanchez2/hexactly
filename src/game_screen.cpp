@@ -21,6 +21,9 @@ static const float POP_DUR   = 0.22f;
 static const float PAUSE_SLIDE = 380.0f;
 static const float BOARD_DROP  = 80.0f;
 
+static const float BOOM_DUR   = 0.90f;
+static const float DEFUSE_DUR = 0.55f;
+
 static const float CELEBRATE_DUR = 1.10f;
 static const float SWAP_DUR      = 0.42f;
 static const float SWAP_DIST     = SCREEN_WIDTH + 160.0f;
@@ -102,6 +105,32 @@ static void drawPortalMarkers(const BoardState& b, Hex pos, Vector2 at) {
         DrawTexturePro(t, { 0, 0, (float)t.width, (float)t.height },
                        { p.x, p.y, S, S }, { S / 2, S / 2 }, 0.0f, WHITE);
     }
+}
+
+// A bomb hex: dark tile, black ball with a lit fuse, and the defuse number.
+static void drawBomb(const Bomb& bomb, Vector2 origin) {
+    Vector2 c = hexToPixel(bomb.pos, origin);
+    c.y += sinf((float)GetTime() * 2.0f + (bomb.pos.q + bomb.pos.r)) * 1.5f;
+    float rot = wobbleDeg(bomb.pos);
+
+    drawHexTile(c, 1.0f, (Color){ 110, 105, 98, 255 }, rot);
+    DrawCircleV({ c.x, c.y + 2 }, HEX_SIZE * 0.44f, INK);
+
+    Vector2 base = { c.x + HEX_SIZE * 0.10f, c.y - HEX_SIZE * 0.36f };
+    Vector2 tip  = { c.x + HEX_SIZE * 0.30f, c.y - HEX_SIZE * 0.54f };
+    DrawLineEx(base, tip, 3.0f, INK);
+    float pulse = 0.5f + 0.5f * sinf((float)GetTime() * 9.0f);
+    DrawCircleV(tip, 2.5f + 2.5f * pulse, (Color){ 240, 185, 40, 255 });
+
+    titleDrawCenteredAtRot(TextFormat("%d", bomb.value), c.x, c.y + 2,
+                           HEX_SIZE * 0.55f, rot, PAPER);
+}
+
+// Pulsing red rim on every tile an armed bomb currently freezes.
+static void drawDangerRim(const BoardState& b, Hex pos, Vector2 at, float rot) {
+    if (!bombGuards(b, pos)) return;
+    float pulse = 0.5f + 0.5f * sinf((float)GetTime() * 3.0f);
+    hexOutline(at, HEX_SIZE - 5, rot, 2.5f, Fade(HEXRED, 0.20f + 0.25f * pulse));
 }
 
 static void drawTargetBadge(int target, Vector2 c) {
@@ -202,8 +231,25 @@ void GameScreen::openRules() {
     presentOverlay();
 }
 
-void GameScreen::showTip(bool portal) {
-    if (portal) {
+void GameScreen::showTip(int kind) {
+    if (kind == 2) {
+        ovTitle = "New: Bombs";
+        ovLines = {
+            "A bomb freezes its neighbourhood:",
+            "merging any tile that touches it",
+            "sets it off - and the level is lost.",
+            "",
+            "To defuse it, land its exact number",
+            "on a cell right next to it. That",
+            "merge is safe, and the bomb is gone.",
+            "",
+            "A wall shields a tile from a bomb.",
+        };
+        if (!rulesMenu.buttons.empty()) rulesMenu.buttons[0].text = "Ok!";
+        presentOverlay();
+        return;
+    }
+    if (kind == 1) {
         ovTitle = "New: Portals";
         ovLines = {
             "A portal links two far-apart cells,",
@@ -290,6 +336,12 @@ void GameScreen::applyLevel(const LevelDef& L) {
         board.portals[i].a = { L.portals[i].q1, L.portals[i].r1 };
         board.portals[i].b = { L.portals[i].q2, L.portals[i].r2 };
     }
+    board.bombCount = L.bombCount;
+    for (int i = 0; i < L.bombCount; i++) {
+        board.bombs[i].pos   = { L.bombs[i].q, L.bombs[i].r };
+        board.bombs[i].value = L.bombs[i].value;
+        board.bombs[i].armed = true;
+    }
 
     int gi = goalIndex(board);
     if (gi >= 0 && board.cells[gi].goalValue == 0) {
@@ -300,13 +352,16 @@ void GameScreen::applyLevel(const LevelDef& L) {
 
     Vector2 sum = { 0, 0 };
     float minX = 1e9f, maxX = -1e9f, minY = 1e9f, maxY = -1e9f;
-    for (int i = 0; i < board.cellCount; i++) {
-        Vector2 px = hexToPixel(board.cells[i].pos, (Vector2){ 0, 0 });
+    for (int i = 0; i < board.cellCount + board.bombCount; i++) {
+        Hex h = (i < board.cellCount) ? board.cells[i].pos
+                                      : board.bombs[i - board.cellCount].pos;
+        Vector2 px = hexToPixel(h, (Vector2){ 0, 0 });
         sum.x += px.x; sum.y += px.y;
         if (px.x < minX) minX = px.x;  if (px.x > maxX) maxX = px.x;
         if (px.y < minY) minY = px.y;  if (px.y > maxY) maxY = px.y;
     }
-    Vector2 avg = { sum.x / board.cellCount, sum.y / board.cellCount };
+    Vector2 avg = { sum.x / (board.cellCount + board.bombCount),
+                    sum.y / (board.cellCount + board.bombCount) };
 
     float ox = SCREEN_WIDTH  / 2.0f - avg.x;
     float oy = SCREEN_HEIGHT / 2.0f + BOARD_DROP - avg.y;
@@ -329,6 +384,9 @@ void GameScreen::applyLevel(const LevelDef& L) {
 
     confettiCount = 0;
     haloTimer     = 0.0f;
+    exploded      = false;
+    boomTimer     = 0.0f;
+    defuseTimer   = 0.0f;
 
     // First-time mechanic tips: show once when a mechanic first appears,
     // then remember it so it never interrupts a replay.
@@ -336,11 +394,15 @@ void GameScreen::applyLevel(const LevelDef& L) {
     if (board.wallCount > 0 && !pr.seenWalls) {
         pr.seenWalls = true;
         saveProgress(pr);
-        showTip(false);
+        showTip(0);
     } else if (board.portalCount > 0 && !pr.seenPortals) {
         pr.seenPortals = true;
         saveProgress(pr);
-        showTip(true);
+        showTip(1);
+    } else if (board.bombCount > 0 && !pr.seenBombs) {
+        pr.seenBombs = true;
+        saveProgress(pr);
+        showTip(2);
     }
 }
 
@@ -353,6 +415,8 @@ void GameScreen::doUndo() {
         board = undoStack[--undoCount];
         phase = PH_PLAYING;
         selectedIdx = -1;
+        exploded  = false;
+        boomTimer = 0.0f;
     }
 }
 
@@ -373,6 +437,22 @@ void GameScreen::doMerge(int fromIdx, int toIdx) {
 
     playMerge();
     selectedIdx = -1;
+
+    BombResult br = applyBombs(board, board.cells[fromIdx].pos,
+                               board.cells[toIdx].pos, v * 2);
+    if (br.defusedIdx >= 0) {
+        defuseTimer  = DEFUSE_DUR;
+        defuseCenter = hexToPixel(board.bombs[br.defusedIdx].pos, origin);
+    }
+    if (br.explodedIdx >= 0) {
+        exploded   = true;
+        boomTimer  = BOOM_DUR;
+        boomCenter = hexToPixel(board.bombs[br.explodedIdx].pos, origin);
+        spawnConfetti(boomCenter);
+        playInvalid();
+        phase = PH_LOST;
+        return;
+    }
     checkEnd();
 }
 
@@ -491,7 +571,9 @@ ScreenType GameScreen::update() {
         }
     }
 
-    if (haloTimer > 0) haloTimer -= dt;
+    if (haloTimer   > 0) haloTimer   -= dt;
+    if (boomTimer   > 0) boomTimer   -= dt;
+    if (defuseTimer > 0) defuseTimer -= dt;
     for (int i = 0; i < confettiCount; i++) {
         Confetti& p = confetti[i];
         p.vel.y += 900.0f * dt;
@@ -803,6 +885,11 @@ void GameScreen::draw() {
                                HEX_SIZE * 0.85f, wrot, numCol);
 
         drawPortalMarkers(board, cell.pos, wc);
+        drawDangerRim(board, cell.pos, wc, wrot);
+    }
+
+    for (int i = 0; i < board.bombCount; i++) {
+        if (board.bombs[i].armed) drawBomb(board.bombs[i], origin);
     }
 
     for (int i = 0; i < board.wallCount; i++) {
@@ -839,6 +926,21 @@ void GameScreen::draw() {
             Vector2 p1 = { starCenter.x + d.x * r1, starCenter.y + d.y * r1 };
             DrawLineEx(p0, p1, 3.0f, Fade(HEXRED, a));
         }
+    }
+
+    if (defuseTimer > 0) {
+        float a = defuseTimer / DEFUSE_DUR;
+        float r = HEX_SIZE * (0.5f + (1.0f - a) * 1.2f);
+        DrawRing(defuseCenter, r - 3, r, 0, 360, 36,
+                 Fade((Color){ 240, 185, 40, 255 }, a));
+    }
+
+    if (boomTimer > 0) {
+        float a = boomTimer / BOOM_DUR;
+        float r = HEX_SIZE * (0.6f + (1.0f - a) * 3.2f);
+        DrawRing(boomCenter, r - 5, r, 0, 360, 48, Fade(HEXRED, a));
+        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Fade(HEXRED, 0.30f * a));
+        drawConfetti();
     }
 
     if (phase == PH_CELEBRATE) {
@@ -891,7 +993,9 @@ void GameScreen::draw() {
     drawIconButton(2, btnInfoTexture(),  rectOf(layout, "info",  { 24, 24, 60, 60 }));
 
     if (phase == PH_LOST) {
-        titleDrawCentered("Stuck! Undo or Restart", SCREEN_HEIGHT - 58.0f, 30, HEXRED);
+        titleDrawCentered(exploded ? "Boom! Undo or Restart"
+                                   : "Stuck! Undo or Restart",
+                          SCREEN_HEIGHT - 58.0f, 30, HEXRED);
     }
 
     if (paused) {
@@ -975,6 +1079,10 @@ void GameScreen::drawStaticBoard(const BoardState& b, Vector2 org) {
         titleDrawCenteredAtRot(TextFormat("%d", cell.value), c.x, c.y,
                                HEX_SIZE * 0.85f, 0.0f, INK);
         drawPortalMarkers(b, cell.pos, c);
+        drawDangerRim(b, cell.pos, c, rot);
+    }
+    for (int i = 0; i < b.bombCount; i++) {
+        if (b.bombs[i].armed) drawBomb(b.bombs[i], org);
     }
     for (int i = 0; i < b.wallCount; i++)
         drawWall(b.walls[i].a, b.walls[i].b, org);
@@ -1022,13 +1130,15 @@ void GameScreen::drawConfetti() {
 // states so the trap-heavy Advanced boards stay fast.
 static std::string stateKey(const BoardState& b) {
     std::string k;
-    k.reserve(b.cellCount * 2 + 1);
+    k.reserve(b.cellCount * 2 + b.bombCount + 1);
     for (int i = 0; i < b.cellCount; i++) {
         int v = b.cells[i].value, e = 0;
         while (v > 1) { v >>= 1; e++; }
         k.push_back((char)('0' + e));
         k.push_back((char)('0' + b.cells[i].op));   // dailies: ops get consumed
     }
+    for (int i = 0; i < b.bombCount; i++)
+        k.push_back(b.bombs[i].armed ? 'A' : 'd');
     k.push_back((char)('a' + b.movesLeft));
     return k;
 }
@@ -1051,6 +1161,9 @@ static bool searchWin(const BoardState& b, std::vector<std::pair<int,int>>& out,
             BoardState nb = b;
             if (merge) {
                 nb.cells[j].value *= 2;
+                BombResult br = applyBombs(nb, b.cells[i].pos, b.cells[j].pos,
+                                           nb.cells[j].value);
+                if (br.explodedIdx >= 0) continue;   // losing move, never take it
             } else {
                 nb.cells[j].value = applyOp(nb.cells[j].op, b.cells[i].value);
                 nb.cells[j].op    = OP_NONE;

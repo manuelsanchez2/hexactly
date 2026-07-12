@@ -51,7 +51,9 @@ equal neighbouring tiles and they double. **Your goal**: chain your merges to re
 
 ### Features
 
- - Puzzle twists: **walls** (blocked edges) and **portals** (link two far cells).
+ - Puzzle twists: **walls** (blocked edges), **portals** (link two far cells) and
+   **bombs** (freeze their neighbours; defuse them by landing their exact number
+   next to them - or go up in smoke).
  - Move-limited levels that must be solved in the tiles you're given.
  - Saved progress and a level-select map that unlocks as you complete levels.
 
