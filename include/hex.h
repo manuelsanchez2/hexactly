@@ -7,7 +7,7 @@ struct Hex {
     int r;
 };
 
-const float HEX_SIZE = 46.0f;
+const float HEX_SIZE = 42.0f;
 
 Vector2 hexToPixel(Hex h, Vector2 origin);
 Hex     pixelToHex(Vector2 p, Vector2 origin);

@@ -16,8 +16,6 @@ struct Cell {
     int  value;
     bool exists;
     bool isGoal;
-    bool isStone;
-    bool isCursed;
     int  goalValue;
     int  op;          // OP_NONE for a normal tile; otherwise an operator tile
 };

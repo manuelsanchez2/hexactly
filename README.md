@@ -73,7 +73,7 @@ Keyboard:
 
 | S1 | S2 | S3 |
 | :---: | :---: | :---: |
-| ![Title screen](screenshots/title-screen.png "Title screen") | ![Level select](screenshots/level-select.png "Level select") | ![Level completed](screenshots/level-complete.png "Level completed") |
+| ![Title screen](screenshots/title-screen.png "Title screen") | ![Level select](screenshots/t1_tab_locked.png "Level select") | ![Level 29](screenshots/shot_level_29.png "Level 29") |
 
 ### Developers
 

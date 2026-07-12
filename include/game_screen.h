@@ -82,6 +82,11 @@ private:
     float rulesAnim    = 0.0f;
     Menu  rulesMenu;
 
+    bool  pendingCongrats = false;   // beat the last Beginner level this run
+    bool  congratsActive  = false;
+    float congratsAnim    = 0.0f;
+    Menu  congratsMenu;
+
     std::string              ovTitle;   // current overlay heading
     std::vector<std::string> ovLines;   // current overlay body lines
 
@@ -91,6 +96,9 @@ private:
 
     float cellWob[MAX_CELLS] = { 0 };
     int   hoverPrev = -1;
+
+    int   moveLimit = 0;     // the loaded level's full move budget
+    float movesWob  = 0.0f;  // wobble timer for the moves-left number
 
     void openRules();
     void showTip(bool portal);
@@ -111,6 +119,9 @@ private:
     void doMerge(int fromIdx, int toIdx);
     void doApply(int fromIdx, int toIdx);
     void checkEnd();
+#if defined(HEX_DEV)
+    void debugSolve();
+#endif
 
     void beginSwap();
     void spawnConfetti(Vector2 at);
