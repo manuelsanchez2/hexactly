@@ -311,6 +311,51 @@ BOMBS = [
         'bombs': [((-1,0), 8), ((1,-1), 16)], 'moves': 5}),
 ]
 
+# --- The finale levels (36-40, bombs + walls + portals) as shipped. --------
+# Mostly goalValue 0 (merge everything); traps >= 1 because some have a
+# single-pair opening, but their move ORDER is unique or near-unique.
+FINALE = [
+    ('checkpoint', {
+        'cells': {(0,1):2, (0,0):2, (1,0):4,
+                  (5,0):8, (6,0):16, (7,0):32},
+        'goal': (7,0), 'goalValue': 0,
+        'walls': [((0,1),(1,0))],
+        'portals': [((1,0),(5,0))],
+        'bombs': [((6,-1), 16), ((7,-1), 32)], 'moves': 5}),
+    ('daisy chain', {
+        'cells': {(0,1):2, (0,0):2, (1,0):4,
+                  (4,0):8, (5,0):16, (6,0):32},
+        'goal': (6,0), 'goalValue': 0,
+        'walls': [((1,-1),(0,0)), ((5,-1),(4,0))],
+        'portals': [((1,0),(4,0))],
+        'bombs': [((0,-1), 4), ((1,-1), 8), ((5,-1), 32)], 'moves': 5}),
+    ('crossed wires', {
+        'cells': {(-4,0):2, (-3,0):2, (-3,1):2, (-2,0):2,
+                  (-1,0):8, (0,0):16, (1,0):32},
+        'goal': (1,0), 'goalValue': 0,
+        'walls': [((-3,0),(-3,1))],
+        'portals': [],
+        'bombs': [((0,-1), 16), ((1,-1), 32)], 'moves': 6}),
+    ('slow burn', {
+        'cells': {(0,0):2, (1,0):2, (2,0):4, (3,0):8,
+                  (0,1):2, (1,1):2, (2,1):4, (3,1):8,
+                  (4,0):32},
+        'goal': (4,0), 'goalValue': 0,
+        'walls': [((2,-1),(1,0)), ((3,1),(4,0)),
+                  ((0,0),(0,1)), ((1,0),(1,1)), ((2,0),(2,1)),
+                  ((0,1),(1,0)), ((1,1),(2,0)), ((2,1),(3,0))],
+        'portals': [],
+        'bombs': [((2,-1), 8)], 'moves': 8}),
+    ('powder keg', {
+        'cells': {(0,0):2, (1,0):2, (2,0):4, (2,1):8,
+                  (5,0):2, (6,0):2, (7,0):4, (6,1):8,
+                  (1,1):32},
+        'goal': (1,1), 'goalValue': 0,
+        'walls': [((6,0),(6,1))],
+        'portals': [((6,1),(2,1))],
+        'bombs': [((1,-1), 4), ((3,1), 16)], 'moves': 8}),
+]
+
 if __name__ == '__main__':
     ok = True
     for name, lvl in ADVANCED:
@@ -319,7 +364,7 @@ if __name__ == '__main__':
                 and r['n_trap_first_moves'] >= 2):
             ok = False
             print(f"  !! {name} FAILED verification")
-    for name, lvl in BOMBS:
+    for name, lvl in BOMBS + FINALE:
         r = report(name, lvl)
         if not (r['min_moves'] == lvl['moves'] and r['n_solution_sets'] == 1
                 and r['n_trap_first_moves'] >= 1):

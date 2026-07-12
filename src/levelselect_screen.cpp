@@ -11,11 +11,12 @@ static const float LS_WOB_DIST = 5.0f;
 static const float LS_WOB_ROT  = 4.0f;
 
 // 25 Beginner cells must fit in 5 rows above the back button (y=636), so the
-// cells are a touch smaller than the original 100px.
+// cells are a touch smaller than the original 100px and the tabs sit high.
 static const int   COLS = 5;
-static const float CW = 86, CH = 86, GAP = 10;
+static const float CW = 92, CH = 92, GAP = 10;
 static const float STEP = CH + GAP;
-static const float GRID_TOP = 158;
+static const float GRID_TOP = 122;
+static const float TAB_Y    = 72;
 
 static const int TAB_COUNT = 2;
 static const char* TAB_NAMES[TAB_COUNT] = { "Beginner", "Advanced" };
@@ -31,7 +32,7 @@ static bool tabOpen(int tab, int unlocked) {
 static Rectangle tabRect(int t) {
     float w = 180, h = 40, gap = 24;
     float x0 = (SCREEN_WIDTH - (TAB_COUNT * w + (TAB_COUNT - 1) * gap)) / 2.0f;
-    return { x0 + t * (w + gap), 108, w, h };
+    return { x0 + t * (w + gap), TAB_Y, w, h };
 }
 
 static float gridStartX() {
@@ -217,7 +218,7 @@ void LevelSelectScreen::draw() {
         Color tint = hover ? WHITE : (Color){ 235, 235, 235, 255 };
         DrawTexturePro(sq, src, { cx, cy, r.width, r.height },
                        { r.width / 2, r.height / 2 }, rot, tint);
-        titleDrawCenteredAtRot(TextFormat("%d", lvl + 1), cx, cy, 34, rot, INK);
+        titleDrawCenteredAtRot(TextFormat("%d", lvl + 1), cx, cy, 36, rot, INK);
         if (done) { Rectangle tr = { r.x + tx, r.y, r.width, r.height }; drawCheck(tr); }
     }
 

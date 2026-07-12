@@ -1,5 +1,5 @@
 # levelselect.layout
 
-label  id=title align=center x=361.215 y=35.6993 size=52 font=title color=ink text=SELECT LEVEL
+label  id=title align=center x=361.215 y=14 size=52 font=title color=ink text=SELECT LEVEL
 button id=daily x=100 y=636 w=240 h=56 text=Daily
 button id=back x=242.039 y=636 w=240 h=56 text=Back
